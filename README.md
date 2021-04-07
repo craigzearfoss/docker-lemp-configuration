@@ -2,13 +2,14 @@
 ---
 
 ### Step 1 - Create the Laravel project
-- Replace {{project_name}} with the name of your project.
+- Replace {{project_name}} with the name of your project everywhere that it appears below.
 ```
 curl -s https://laravel.build/{{project_name}} | bash
 ```
 
 ### Step 2 - Copy Docker configuration files
 - Copy everything from the **base** directory into your project directory.
+- Replace {{project_name}} with the name of your project everywhere that it appears below.
 ```
 $ cd {{project_name}}
 $ cp -r {{this_directory}}/docker-compose/ docker-compose/
@@ -34,7 +35,7 @@ DB_PASSWORD=password
 ```
 
 ### Step 4 - Nginx configuration
-- Rename the file docker-compose/nginx/project_name.conf to your project name.
+- Rename the file docker-compose/nginx/{{project_name}}.conf to your project name.
 
 ### Step 5 - MySQL initialization file
 - Add your initialization SQL commands in the file docker-compose/mysql/init_db.sql.
