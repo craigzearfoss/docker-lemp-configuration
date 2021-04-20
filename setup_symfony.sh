@@ -1,5 +1,5 @@
 #!/bin/bash
-printf "\nSetting up Laravel Docker Project Environment\n"
+printf "\nSetting up Symfony Project Environment\n"
 
 working_dir="$(pwd)"
 base_dir=$(echo $working_dir | sed "s|\(.*\)/.*|\1|")
@@ -26,6 +26,14 @@ else
   fi
   project_dir="${custom_base_dir}/${project_name}"
 fi
+
+# Is this a full project or a microservice
+while [ "${full_install}" != "y" ] && [ "${full_install}" != "n" ]; do
+  printf "\nEnter 'y' for a full install or 'n' if you are building a microservice, console application or API. "
+  read full_install
+  full_install=$(echo ${full_install,,})
+  echo $full_install
+done
 
 # Get database user credentials.
 while [ -z "$port" ]; do
@@ -70,10 +78,14 @@ fi
 
 printf "\nHit [Enter] to continue or Ctrl-C to quit."
 
-# Create the Laravel project.
+# Create the Symfony project.
 cd "${base_dir}"
-printf "\nCreating the Laravel project ...\n"
-curl -s "https://laravel.build/${project_name}" | bash
+printf "\nCreating the Symfony project ...\n"
+if [ "${full_install}" == "y"]; then
+  composer create-project symfony/website-skeleton "${project_name}"
+else
+  composer create-project symfony/skeleton "${project_name}"
+fi
 
 # Set database settings in .env file
 printf "\nAdd database user credentials to .env file."
