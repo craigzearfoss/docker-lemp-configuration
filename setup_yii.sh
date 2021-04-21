@@ -1,5 +1,5 @@
 #!/bin/bash
-printf "\nSetting up Symfony Project Environment\n"
+printf "\nSetting up Yii Docker Project Environment\n"
 
 docker_compose_yml_version="nginx-mysql"
 dockerfile_filename="php-7-4-fpm"
@@ -29,14 +29,6 @@ else
   fi
   project_dir="${custom_base_dir}/${project_name}"
 fi
-
-# Is this a full project or a microservice
-while [ "${full_install}" != "y" ] && [ "${full_install}" != "n" ]; do
-  printf "\nEnter 'y' for a full install or 'n' if you are building a microservice, console application or API. "
-  read full_install
-  full_install=$(echo ${full_install,,})
-  echo $full_install
-done
 
 # Get database user credentials.
 while [ -z "$port" ]; do
@@ -88,14 +80,10 @@ fi
 printf "\nHit [Enter] to continue or Ctrl-C to quit."
 read reply
 
-# Create the Symfony project.
+# Create the Yii project.
 cd "${base_dir}"
-printf "\nCreating the Symfony project ...\n"
-if [ "$full_install" == "y"]; then
-  composer create-project symfony/website-skeleton "${project_name}"
-else
-  composer create-project symfony/skeleton "${project_name}"
-fi
+printf "\nCreating the Yii project ...\n"
+composer create-project --prefer-dist yiisoft/yii2-app-basic "$project_name"
 
 # Set database settings in .env file
 printf "\nAdding database user credentials to .env file ..."
@@ -134,6 +122,8 @@ docker-compose build
 docker-compose up -d
 docker-compose ps
 docker-compose exec app composer install
+
+docker exec -d "${project_name}-app" php yii serve --port=${port}
 
 printf "\nIf you see any errors with the 'composer install' command then run a composer update with the command:"
 printf "\n\tdocker-compose exec app composer update"

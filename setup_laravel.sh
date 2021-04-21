@@ -1,6 +1,9 @@
 #!/bin/bash
 printf "\nSetting up Laravel Docker Project Environment\n"
 
+docker_compose_yml_version="nginx-mysql"
+dockerfile_filename="php-7-4-fpm"
+
 working_dir="$(pwd)"
 base_dir=$(echo $working_dir | sed "s|\(.*\)/.*|\1|")
 working_dir="$working_dir"
@@ -37,15 +40,20 @@ while [ -z "$port" ]; do
 done
 
 # Get database user credentials.
-db_username=
-while [ -z "$db_username" ]; do
-  printf "\nEnter DB_USERNAME: "
-  read db_username
+mysql_root_password=
+while [ -z "$mysql_root_password" ]; do
+  printf "\nEnter MYSQL_ROOT_PASSWORD: "
+  read mysql_root_password
 done
-db_password=
-while [ -z "$db_password" ]; do
-  printf "\nEnter DB_PASSWORD: "
-  read db_password
+mysql_user_name=
+while [ -z "$mysql_user_name" ]; do
+  printf "\nEnter MYSQL_USER: "
+  read mysql_user_name
+done
+mysql_user_password=
+while [ -z "$mysql_user_password" ]; do
+  printf "\nEnter MYSQL_PASSWORD: "
+  read mysql_user_password
 done
 
 printf "\nproject_name: $project_name"
@@ -53,8 +61,9 @@ printf "\nbase_dir:     $base_dir"
 printf "\nworking_dir:  $working_dir"
 printf "\nproject_dir:  $project_dir"
 printf "\nport:         $port"
-printf "\nDB_USERNAME:  $db_username"
-printf "\nDB_PASSWORD:  $db_password"
+printf "\nMYSQL_ROOT_PASSWORD: $mysql_root_password"
+printf "\nMYSQL_USER:          $mysql_user_name"
+printf "\nMYSQL_USER_PASSWORD: $mysql_user_password"
 printf "\n"
 
 if [ -d $project_dir ]; then
@@ -69,6 +78,7 @@ if [ -z "$base_dir" ]; then
 fi
 
 printf "\nHit [Enter] to continue or Ctrl-C to quit."
+read reply
 
 # Create the Laravel project.
 cd "${base_dir}"
@@ -76,9 +86,9 @@ printf "\nCreating the Laravel project ...\n"
 curl -s "https://laravel.build/${project_name}" | bash
 
 # Set database settings in .env file
-printf "\nAdd database user credentials to .env file."
-sed -i "s/DB_USERNAME=sail/DB_USERNAME=${db_username}/g" ${project_dir}/.env
-sed -i "s/DB_PASSWORD=password/DB_PASSWORD==${db_password}/g" ${project_dir}/.env
+printf "\nAdding database user credentials to .env file ..."
+sed -i "s/DB_USERNAME=sail/DB_USERNAME=${mysql_user_name}/g" ${project_dir}/.env
+sed -i "s/DB_PASSWORD=password/DB_PASSWORD==${mysql_user_password}/g" ${project_dir}/.env
 
 # Copy configuration files.
 nginx_conf_file="${project_dir}/docker-compose/nginx/${project_name}.conf"
@@ -93,12 +103,20 @@ mkdir "${project_dir}/docker-compose/nginx/"
 
 cp "${working_dir}/docker-compose/nginx/project_name.conf" "${nginx_conf_file}"
 cp "${working_dir}/docker-compose/mysql/init_db.sql" "${mysql_init_file}"
-cp "${working_dir}/docker-compose.yml" "${docker_compose_file}"
-cp "${working_dir}/Dockerfile" "${docker_file}"
+cp "${working_dir}/configurations/docker-compose-files/${docker_compose_yml_version}/docker-compose.yml" "${docker_compose_file}"
+cp "${working_dir}/configurations/Dockerfiles/${dockerfile_filename}" "${docker_file}"
 
-# Make changes for configuration files.
+# Making changes to docker-compose.yml file
+printf "\nMaking changes to docker-compose.yml file ..."
 sed -i "s/{{project_name}}/${project_name}/g" ${docker_compose_file}
 sed -i "s/{{port}}/${port}/g" ${docker_compose_file}
+
+# Set database settings in docker-compose.yml file
+printf "\nAdding database user credentials to docker-compose.yml file.\n"
+sed -i "s/MYSQL_DATABASE: \${DB_DATABASE}/MYSQL_DATABASE: \"${project_name}\"/g" ${project_dir}/docker-compose.yml
+sed -i "s/MYSQL_ROOT_PASSWORD: \${DB_PASSWORD}/MYSQL_ROOT_PASSWORD: \"${mysql_root_password}\"/g" ${project_dir}/docker-compose.yml
+sed -i "s/MYSQL_PASSWORD: \${DB_PASSWORD}/MYSQL_USER_PASSWORD: \"${mysql_user_password}\"/g" ${project_dir}/docker-compose.yml
+sed -i "s/MYSQL_USER: \${DB_USERNAME}/MYSQL_USER_NAME: \"${mysql_user_name}\"/g" ${project_dir}/docker-compose.yml
 
 docker-compose build
 docker-compose up -d
