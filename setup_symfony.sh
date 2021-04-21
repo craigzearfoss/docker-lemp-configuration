@@ -130,6 +130,13 @@ sed -i "s/MYSQL_ROOT_PASSWORD: \${DB_PASSWORD}/MYSQL_ROOT_PASSWORD: \"${mysql_ro
 sed -i "s/MYSQL_PASSWORD: \${DB_PASSWORD}/MYSQL_USER_PASSWORD: \"${mysql_user_password}\"/g" ${project_dir}/docker-compose.yml
 sed -i "s/MYSQL_USER: \${DB_USERNAME}/MYSQL_USER_NAME: \"${mysql_user_name}\"/g" ${project_dir}/docker-compose.yml
 
+# Add superuser create to init_db.sql file
+echo "CREATE USER '${mysql_user_name}'@'localhost' IDENTIFIED BY \"${mysql_user_password}\";" >> ${mysql_init_file}
+echo "GRANT ALL PRIVILEGES ON *.* TO '${mysql_user_name}'@'localhost' WITH GRANT OPTION;" >> ${mysql_init_file}
+echo "CREATE USER '${mysql_user_name}'@'%' IDENTIFIED BY \"${mysql_user_password}\";" >> ${mysql_init_file}
+echo "GRANT ALL PRIVILEGES ON *.* TO '${mysql_user_name}'@'%' WITH GRANT OPTION;" >> ${mysql_init_file}
+echo "FLUSH PRIVILEGES;" >> ${mysql_init_file}
+
 docker-compose build
 docker-compose up -d
 docker-compose ps
