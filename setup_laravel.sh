@@ -111,13 +111,6 @@ printf "\nMaking changes to docker-compose.yml file ..."
 sed -i "s/{{project_name}}/${project_name}/g" ${docker_compose_file}
 sed -i "s/{{port}}/${port}/g" ${docker_compose_file}
 
-# Set database settings in docker-compose.yml file
-printf "\nAdding database user credentials to docker-compose.yml file.\n"
-sed -i "s/MYSQL_DATABASE: \${DB_DATABASE}/MYSQL_DATABASE: \"${project_name}\"/g" ${project_dir}/docker-compose.yml
-sed -i "s/MYSQL_ROOT_PASSWORD: \${DB_PASSWORD}/MYSQL_ROOT_PASSWORD: \"${mysql_root_password}\"/g" ${project_dir}/docker-compose.yml
-sed -i "s/MYSQL_PASSWORD: \${DB_PASSWORD}/MYSQL_USER_PASSWORD: \"${mysql_user_password}\"/g" ${project_dir}/docker-compose.yml
-sed -i "s/MYSQL_USER: \${DB_USERNAME}/MYSQL_USER_NAME: \"${mysql_user_name}\"/g" ${project_dir}/docker-compose.yml
-
 # Add superuser create to init_db.sql file
 echo "CREATE USER '${mysql_user_name}'@'localhost' IDENTIFIED BY \"${mysql_user_password}\";" >> ${mysql_init_file}
 echo "GRANT ALL PRIVILEGES ON *.* TO '${mysql_user_name}'@'localhost' WITH GRANT OPTION;" >> ${mysql_init_file}
