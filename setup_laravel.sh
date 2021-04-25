@@ -17,6 +17,10 @@ if [ -z "$project_name" ]; then
   exit
 fi
 
+# Get the git repo.
+printf "\nEnter the git repo. Hit [Enter] to create a new Laravel project. "
+read git_repo
+
 # Get the project directory.
 printf "\nEnter the directory where the project will be created."
 printf "\nHit [Enter] to use the directory ${base_dir}/${project_name}.\n"
@@ -57,6 +61,7 @@ while [ -z "$mysql_user_password" ]; do
 done
 
 printf "\nproject_name: $project_name"
+printf "\ngit_repo:     $git_repo"
 printf "\nbase_dir:     $base_dir"
 printf "\nworking_dir:  $working_dir"
 printf "\nproject_dir:  $project_dir"
@@ -82,13 +87,33 @@ read reply
 
 # Create the Laravel project.
 cd "${base_dir}"
-printf "\nCreating the Laravel project ...\n"
-curl -s "https://laravel.build/${project_name}" | bash
+if [ -z "$git_repo" ]; then
+  printf "\nCreating the Laravel project ...\n"
+  curl -s "https://laravel.build/${project_name}" | bash
 
-# Set database settings in .env file
-printf "\nAdding database user credentials to .env file ..."
-sed -i "s/DB_USERNAME=sail/DB_USERNAME=${mysql_user_name}/g" ${project_dir}/.env
-sed -i "s/DB_PASSWORD=password/DB_PASSWORD==${mysql_user_password}/g" ${project_dir}/.env
+  # Set database settings in .env file
+  printf "\nAdding database user credentials to .env file ..."
+  db_name=$project_name
+  sed -i "s/DB_USERNAME=sail/DB_USERNAME=${mysql_user_name}/g" ${project_dir}/.env
+  sed -i "s/DB_PASSWORD=password/DB_PASSWORD==${mysql_user_password}/g" ${project_dir}/.env
+else
+  printf "\nDownloading git repo ${git_repo} ...\n"
+  git clone $git_repo $project_name
+  cp "${project_dir}/.env.example" "${project_dir}/.env"
+
+  # Set database settings in .env file
+  printf "\nAdding database user credentials to .env file ..."
+  db_name=$(grep DB_DATABASE ${project_dir}/.env | cut -d '=' -f2)
+  if [ -z "${db_name}"]; then
+    db_name=$project_name
+    sed -i "/^\DB_DATABASE=.*/ s//DB_D
+    ATABASE=${db_name}/" ${project_dir}/.env
+  fi
+  sed -i "/^\DB_HOST=.*/ s//DB_HOST=mysql/" ${project_dir}/.env
+  sed -i "/^\DB_USERNAME=.*/ s//DB_USERNAME=${mysql_user_name}/" ${project_dir}/.env
+  sed -i "/^\DB_PASSWORD=.*/ s//DB_PASSWORD=${mysql_user_password}/" ${project_dir}/.env
+fi
+
 
 # Copy configuration files.
 nginx_conf_file="${project_dir}/docker-compose/nginx/${project_name}.conf"
