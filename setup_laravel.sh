@@ -18,7 +18,7 @@ if [ -z "$project_name" ]; then
 fi
 
 # Get the git repo.
-printf "\nEnter the git repo. Hit [Enter] to create a new Laravel project. "
+printf "\nEnter the git repo or hit [Enter] to create a new Laravel project. "
 read git_repo
 
 # Get the project directory.
