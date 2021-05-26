@@ -1,5 +1,5 @@
 #!/bin/bash
-printf "\nSetting up Laravel Docker Project Environment\n"
+printf "\nSetting up CodeIgniter Docker Project Environment\n"
 
 docker_compose_yml_version="nginx-mysql"
 dockerfile_filename="php-7-4-fpm"
@@ -18,7 +18,7 @@ if [ -z "$project_name" ]; then
 fi
 
 # Get the git repo.
-printf "\nEnter the git repo or hit [Enter] to create a new Laravel project. "
+printf "\nEnter the git repo or hit [Enter] to create a new CodeIgniter project. "
 read git_repo
 
 # Get the project directory.
@@ -89,7 +89,7 @@ read reply
 cd "${base_dir}"
 if [ -z "$git_repo" ]; then
   printf "\nCreating the Laravel project ...\n"
-  curl -s "https://laravel.build/${project_name}" | bash
+  composer create-project codeigniter4/appstarter project-root | bash
 
   # Set database settings in .env file
   printf "\nAdding database user credentials to .env file ..."
@@ -106,13 +106,14 @@ else
   db_name=$(grep DB_DATABASE ${project_dir}/.env | cut -d '=' -f2)
   if [ -z "${db_name}"]; then
     db_name=$project_name
-    sed -i "/^\DB_DATABASE=.*/ s//DB_DATABASE=${db_name}/" ${project_dir}/.env
+    sed -i "/^\DB_DATABASE=.*/ s//DB_D
+    ATABASE=${db_name}/" ${project_dir}/.env
   fi
   sed -i "/^\DB_HOST=.*/ s//DB_HOST=mysql/" ${project_dir}/.env
   sed -i "/^\DB_USERNAME=.*/ s//DB_USERNAME=${mysql_user_name}/" ${project_dir}/.env
   sed -i "/^\DB_PASSWORD=.*/ s//DB_PASSWORD=${mysql_user_password}/" ${project_dir}/.env
 fi
-
+exit
 
 # Copy configuration files.
 nginx_conf_file="${project_dir}/docker-compose/nginx/${project_name}.conf"
