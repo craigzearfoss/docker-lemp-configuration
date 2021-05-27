@@ -101,6 +101,8 @@ create_docker_containers() {
     sed -i "s/access_log .*/access_log \/var\/www\/${project_name}\/log\/access.log;/g" ${nginx_conf_file}
   elif [[ $project_framework == "CodeIgniter" ]]; then
     sed -i "s/root .*/root \/var\/www\/${project_name}\/public;/g" ${nginx_conf_file}
+    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${nginx_conf_file}
+    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${nginx_conf_file}
   elif [[ $project_framework == "Yii" ]]; then
     sed -i "s/root .*/root \/var\/www\/${project_name}\/web;/g" ${nginx_conf_file}
     sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${nginx_conf_file}
@@ -344,16 +346,21 @@ elif [[ $project_framework == "CodeIgniter" ]]; then
   # CodeIgniter
   printf "\nUpdating .env file ...\n"
   docker-compose exec app sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/# database.default.hostname =.*/database.default.hostname = db-mysql/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/# database.default.database =.*/database.default.database = ${mysql_database}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/# database.default.username =.*/database.default.username = ${mysql_user_name}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/# database.default.password =.*/database.default.password = ${mysql_user_password}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/# database.default.DBDriver =.*/database.default.DBDriver = MySQLi/g" "${local_project_dir}/.env"
+  #docker-compose exec app sed -i "0,/'hostname' => 'localhost'/s/'hostname' => 'localhost'/'hostname' => 'db-mysql'/" "${local_project_dir}/app/Config/Database.php"
+  #docker-compose exec app sed -i "0,/'username' => ''/s/'username' => ''/'username' => '${mysql_user_name}'/" "${local_project_dir}/app/Config/Database.php"
+  #docker-compose exec app sed -i "0,/'password' => ''/s/'password' => ''/'password' => '${mysql_user_password}'/" "${local_project_dir}/app/Config/Database.php"
+  #docker-compose exec app sed -i "0,/'database' => ''/s/'database' => ''/'database' => '${mysql_database}'/" "${local_project_dir}/app/Config/Database.php"
 elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
   # Laravel/Lumen
   printf "\nUpdating .env file ...\n"
   docker-compose exec app sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/APP_KEY=.*/APP_KEY=$(openssl rand -base64 64)/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db-mysql/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/DB_DATABASE=.*/DB_DATABASE=${mysql_database}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/DB_USERNAME=.*/DB_USERNAME=${mysql_user_name}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${mysql_user_password}/g" "${local_project_dir}/.env"
