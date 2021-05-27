@@ -99,6 +99,8 @@ create_docker_containers() {
     sed -i "s/root .*/root   \/var\/www\/${project_name}\/public\/webroot;/g" ${nginx_conf_file}
     sed -i "s/error_log .*/error_log  \/var\/www\/${project_name}\/log\/error.log;/g" ${nginx_conf_file}
     sed -i "s/access_log .*/access_log \/var\/www\/${project_name}\/log\/access.log;/g" ${nginx_conf_file}
+  elif [[ $project_framework == "CodeIgniter" ]]; then
+    sed -i "s/root .*/root \/var\/www\/${project_name}\/public;/g" ${nginx_conf_file}
   elif [[ $project_framework == "Yii" ]]; then
     sed -i "s/root .*/root \/var\/www\/${project_name}\/web;/g" ${nginx_conf_file}
     sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${nginx_conf_file}
