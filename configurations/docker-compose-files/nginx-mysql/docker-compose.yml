@@ -16,7 +16,7 @@ services:
     networks:
       - {{project_name}}
 
-  mysql:
+  db:
     image: mysql:5.7
     container_name: {{project_name}}-mysql
     restart: unless-stopped
