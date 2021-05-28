@@ -14,6 +14,7 @@ project_dir="${project_base_dir}/${project_name}"
 local_project_dir="/var/www/${project_name}"
 port=
 default_port=8000
+phpmyadmin_port=$(($default_port + 1))
 mysql_database=${project_name//[\-]/_}
 mysql_root_password=
 mysql_user_name=
@@ -21,7 +22,8 @@ mysql_user_password=
 default_full_install="Y"
 full_install=${default_full_install}
 run_migrations="Y"
-
+echo $phpmyadmin_port
+exit
 # Create an array of available Docker files.
 declare -a docker_files
 basename "${working_dir}/configurations/Dockerfiles"
@@ -222,9 +224,21 @@ custom_base_dir=${custom_base_dir:-${project_base_dir}}
 project_base_dir=$custom_base_dir
 project_dir="${project_base_dir}/${project_name}"
 
+# Make sure the project directory does not already exist.
+if [ -d $project_dir ]; then
+  printf "\nThe directory ${project_dir} already exists.\n"
+  exit
+fi
+# Make sure the project base directory exists.
+if [ -d "project_base_dir" ]; then
+  printf "\nThe project base directory ${project_base_dir} does not exist.  Please create it and rerun this script.\n"
+  exit
+fi
+
 # Get the port.
 read -p "Port [${default_port}]: " port
 port=${port:-${default_port}}
+phpmyadmin_port=$(($port + 1))
 
 # Get database user credentials.
 mysql_root_password=
@@ -258,17 +272,6 @@ printf "\nMySQL Root Password: ***${mysql_root_password: -3}"
 printf "\nMySQL User Name:     ${mysql_user_name}"
 printf "\nMySQL User Password: ***${mysql_user_password: -3}"
 printf "\n---------------------------------------------------\n\n"
-
-if [ -d $project_dir ]; then
-  printf "\nThe directory ${project_dir} already exists.\n"
-  exit
-fi
-
-# Make sure the project base directory exists.
-if [ -d "project_base_dir" ]; then
-  printf "\nThe project base directory ${project_base_dir} does not exist.  Please create it and rerun this script.\n"
-  exit
-fi
 
 read -p "Hit [Enter] to continue or Ctrl-C to quit." reply
 
@@ -358,12 +361,12 @@ elif [[ $project_framework == "CodeIgniter" ]]; then
 elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
   # Laravel/Lumen
   printf "\nUpdating .env file ...\n"
-  docker-compose exec app sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/APP_KEY=.*/APP_KEY=$(openssl rand -base64 64)/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db-mysql/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_DATABASE=.*/DB_DATABASE=${mysql_database}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_USERNAME=.*/DB_USERNAME=${mysql_user_name}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${mysql_user_password}/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/APP_KEY=.*/APP_KEY=$(openssl rand -base64 64)/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db-mysql/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_DATABASE=.*/DB_DATABASE=${mysql_database}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_USERNAME=.*/DB_USERNAME=${mysql_user_name}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${mysql_user_password}/" "${local_project_dir}/.env"
 elif [[ $project_framework == "Symfony" ]]; then
   # Symfony
   printf "\nUpdating .env file ...\n"
@@ -394,5 +397,6 @@ fi
 
 printf "\nIf you see any errors with the 'composer install' command then run a composer update with the command:\n"
 printf "\tdocker-compose exec app composer update\n"
-printf "You should now be able to go to http://localhost:${port} in your browser.\n"
+printf "\tYou can now go to http://localhost:${port} in your browser.\n"
+printf "\tYou can access phpMyAdmin at http://localhost:${phpmyadmin_port} where the server is \"db-mysql\".\n"
 exit

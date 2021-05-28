@@ -27,11 +27,27 @@ services:
       MYSQL_USER: ${DB_USERNAME}
       SERVICE_TAGS: dev
       SERVICE_NAME: mysql
+    ports:
+      - "6603:3306"
     volumes:
       - ./docker-compose/mysql:/docker-entrypoint-initdb.d
     networks:
       - {{project_name}}
 
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: {{project_name}}-phpmyadmin
+    environment:
+      PMA_HOST: db-mysql
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    restart: always
+    networks:
+      - {{project_name}}
+    depends_on:
+      - db-mysql
+    ports:
+      - 8081:80
   nginx:
     image: nginx:alpine
     container_name: {{project_name}}-nginx
@@ -47,3 +63,5 @@ services:
 networks:
   {{project_name}}:
     driver: bridge
+volumes:
+  dbdata:
