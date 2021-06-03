@@ -1,0 +1,12 @@
+  nginx:
+    image: nginx:alpine
+    container_name: {{project_name}}-nginx
+    restart: unless-stopped
+    ports:
+      - {{port}}:80
+    volumes:
+      - ./:/var/www
+      - ./docker-compose/nginx:/etc/nginx/conf.d/
+    networks:
+      - {{project_name}}
+

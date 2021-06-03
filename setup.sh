@@ -1,8 +1,14 @@
 #!/bin/bash
 printf "\nCreate a PHP Development Environment\n"
 
+docker_version="3.7"
 docker_compose_yml_version="nginx-mysql"
 dockerfile_filename="php-7-4-fpm"
+
+service_app="app"
+service_db="mysql"
+service_phpmyadmin="phpmyadmin"
+service_server="nginx"
 
 project_name=$1
 project_framework=""
@@ -15,15 +21,14 @@ local_project_dir="/var/www/${project_name}"
 port=
 default_port=8000
 phpmyadmin_port=$(($default_port + 1))
-mysql_database=${project_name//[\-]/_}
-mysql_root_password=
-mysql_user_name=
-mysql_user_password=
+db_name=${project_name//[\-]/_}
+db_root_password=
+db_username=
+db_password=
 default_full_install="Y"
 full_install=${default_full_install}
 run_migrations="Y"
-echo $phpmyadmin_port
-exit
+
 # Create an array of available Docker files.
 declare -a docker_files
 basename "${working_dir}/configurations/Dockerfiles"
@@ -65,36 +70,42 @@ create_docker_containers() {
   printf "\nCopying configuration files ...\n"
   cd "${project_dir}"
   mkdir "${project_dir}/docker-compose/"
-  mkdir "${project_dir}/docker-compose/mysql/"
-  mkdir "${project_dir}/docker-compose/nginx/"
+  mkdir "${project_dir}/docker-compose/${service_db}/"
+  mkdir "${project_dir}/docker-compose/${service_server}/"
 
-  # Copy nginx configuration file.
-  if [ -f "${working_dir}/docker-compose/nginx/${project_framework}/project_name.conf" ]; then
-    cp "${working_dir}/docker-compose/nginx/${project_framework}/project_name.conf" "${nginx_conf_file}"
+  # Copy nginx configuration file. (First look for framework-specific configuration file.)
+  if [ -f "${working_dir}/docker-compose/${service_server}/${project_framework}/project_name.conf" ]; then
+    cp "${working_dir}/docker-compose/${service_server}/${project_framework}/project_name.conf" "${nginx_conf_file}"
   else
-    cp "${working_dir}/docker-compose/nginx/project_name.conf" "${nginx_conf_file}"
+    cp "${working_dir}/docker-compose/${service_server}/project_name.conf" "${nginx_conf_file}"
   fi
 
   # Copy initial db commands file.
-  cp "${working_dir}/docker-compose/mysql/init_db.sql" "${mysql_init_file}"
+  cp "${working_dir}/docker-compose/${service_db}/init_db.sql" "${mysql_init_file}"
 
-  # Copy docker-compose.yml file.
-  cp "${working_dir}/configurations/docker-compose-files/${docker_compose_yml_version}/docker-compose.yml" "${docker_compose_file}"
-
-  # Copy Dockerfile.
-  cp "${working_dir}/configurations/Dockerfiles/${dockerfile_filename}" "${docker_file}"
-
-  #cp "${working_dir}/docker-compose/nginx/project_name.conf" "${nginx_conf_file}"
-  #cp "${working_dir}/docker-compose/mysql/init_db.sql" "${mysql_init_file}"
-  #cp "${working_dir}/configurations/docker-compose-files/${docker_compose_yml_version}/docker-compose.yml" "${docker_compose_file}"
-  #cp "${working_dir}/configurations/Dockerfiles/${dockerfile_filename}" "${docker_file}"
+  # Create docker-compose.yml file.
+  printf "Creating docker-compose.yml file ...\n"
+  echo "version: \"${docker_version}\"" > "${docker_compose_file}"
+  echo "services:" >> "${docker_compose_file}"
+  cat "${working_dir}/configurations/docker-compose-sections/service-${service_app}" >> "${docker_compose_file}"
+  cat "${working_dir}/configurations/docker-compose-sections/service-${service_db}" >> "${docker_compose_file}"
+  cat "${working_dir}/configurations/docker-compose-sections/service-${service_phpmyadmin}" >> "${docker_compose_file}"
+  cat "${working_dir}/configurations/docker-compose-sections/service-${service_server}" >> "${docker_compose_file}"
+  cat "${working_dir}/configurations/docker-compose-sections/networks" >> "${docker_compose_file}"
+  cat "${working_dir}/configurations/docker-compose-sections/volumes" >> "${docker_compose_file}"
 
   # Make changes to docker-compose.yml file.
-  printf "Making changes to docker-compose.yml file ...\n"
+  printf "Updating docker-compose.yml file ...\n"
   sed -i "s/{{project_name}}/${project_name}/g" ${docker_compose_file}
   sed -i "s/{{port}}/${port}/g" ${docker_compose_file}
+  sed -i "s/{{phpmyadmin_port}}/${phpmyadmin_port}/g" ${docker_compose_file}
+
+  # Copy Dockerfile.
+  printf "Copying Dockerfile file ...\n"
+  cp "${working_dir}/configurations/Dockerfiles/${dockerfile_filename}" "${docker_file}"
 
   # Make changes to the nginx configuration file.
+  printf "Updating Nginx configuration file ...\n"
   if [[ $project_framework == "CakePHP" ]]; then
     sed -i "s/server_name .*/server_name localhost;/g" ${nginx_conf_file}
     sed -i "s/[::]:80 /[::]:${port}/g" ${nginx_conf_file}
@@ -115,26 +126,30 @@ create_docker_containers() {
     sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${nginx_conf_file}
   fi
 
-  export DB_DATABASE="${mysql_database}"
-  export DB_ROOT_PASSWORD="${mysql_root_password}"
-  export DB_USERNAME="${mysql_user_name}"
-  export DB_PASSWORD="${mysql_user_password}"
+  printf "Adding database credentials ...\n"
+  export DB_DATABASE="${db_name}"
+  export DB_ROOT_PASSWORD="${db_root_password}"
+  export DB_USERNAME="${db_username}"
+  export DB_PASSWORD="${db_password}"
 
   # Add superuser create to init_db.sql file
-  echo "CREATE DATABASE FLUSH ${mysql_database};" >> ${mysql_init_file}
-  echo "CREATE USER '${mysql_user_name}'@'localhost' IDENTIFIED BY \"${mysql_user_password}\";" >> ${mysql_init_file}
-  echo "GRANT ALL PRIVILEGES ON *.* TO '${mysql_user_name}'@'localhost' WITH GRANT OPTION;" >> ${mysql_init_file}
-  echo "CREATE USER '${mysql_user_name}'@'%' IDENTIFIED BY \"${mysql_user_password}\";" >> ${mysql_init_file}
-  echo "GRANT ALL PRIVILEGES ON *.* TO '${mysql_user_name}'@'%' WITH GRANT OPTION;" >> ${mysql_init_file}
+  echo "CREATE DATABASE FLUSH ${db_name};" >> ${mysql_init_file}
+  echo "CREATE USER '${db_username}'@'localhost' IDENTIFIED BY \"${db_password}\";" >> ${mysql_init_file}
+  echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'localhost' WITH GRANT OPTION;" >> ${mysql_init_file}
+  echo "CREATE USER '${db_username}'@'%' IDENTIFIED BY \"${db_password}\";" >> ${mysql_init_file}
+  echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'%' WITH GRANT OPTION;" >> ${mysql_init_file}
   echo "FLUSH PRIVILEGES;" >> ${mysql_init_file}
 
+  printf "Building Docker containers ...\n"
   docker-compose build
   docker-compose up -d
   docker-compose ps
+
+  printf "Installing composer ...\n"
   docker-compose exec app composer install
 
   # Remove init_db.sql setup file.
-  rm "${project_dir}/docker-compose/mysql/init_db.sql"
+  rm "${project_dir}/docker-compose/${service_db}/init_db.sql"
 }
 
 # Get the project name.
@@ -151,12 +166,13 @@ if [ -z "$project_name" ]; then
 fi
 project_dir="${project_base_dir}/${project_name}"
 local_project_dir="/var/www/${project_name}"
-mysql_database=${project_name//[\-]/_}
+db_name=${project_name//[\-]/_}
 
 # Get the git repo. (If there is one.)
 read -p "Git repository (Leave blank for none.): " git_repo
 
 # Get the type of project
+selected_option=-1
 while [[ selected_option -lt 1 || selected_option -gt 8 ]]; do
   printf "\nSelect the type of project."
   printf "\n\t1 - CakePHP"
@@ -240,20 +256,37 @@ read -p "Port [${default_port}]: " port
 port=${port:-${default_port}}
 phpmyadmin_port=$(($port + 1))
 
+# Get database type
+selected_option=-1
+while [[ selected_option -lt 1 || selected_option -gt 2 ]]; do
+  printf "\nSelect the type of database:"
+  printf "\n\t1 - MySQL"
+  printf "\n\t2 - Postgres"
+  printf "\n"
+  read selected_option
+  selected_option="$((selected_option))"
+done
+if [[ "$selected_option" -eq 1 ]]; then
+  service_db="mysql"
+fi
+if [[ "$selected_option" -eq 2 ]]; then
+  service_db="postgres"
+fi
+
 # Get database user credentials.
-mysql_root_password=
-while [ -z "$mysql_root_password" ]; do
-  read -p "MYSQL_ROOT_PASSWORD: " mysql_root_password
+db_root_password=
+while [ -z "$db_root_password" ]; do
+  read -p "Enter database root password: " db_root_password
 done
 
-mysql_user_name=
-while [ -z "$mysql_user_name" ]; do
-  read -p "Enter MYSQL_USER: " mysql_user_name
+db_username=
+while [ -z "$db_username" ]; do
+  read -p "Enter database username: " db_username
 done
 
-mysql_user_password=
-while [ -z "$mysql_user_password" ]; do
-  read -p "Enter MYSQL_PASSWORD: " mysql_user_password
+db_password=
+while [ -z "$db_password" ]; do
+  read -p "Enter database user password: " db_password
 done
 
 printf "\n---------------------------------------------------"
@@ -267,17 +300,20 @@ printf "\nGit Repo:            ${git_repo}"
 #printf "\nWorking Dir:         ${working_dir}"
 #printf "\nBase Dir:            ${base_dir}"
 printf "\nPort:                ${port}"
-printf "\nMySQL Database:      ${mysql_database}"
-printf "\nMySQL Root Password: ***${mysql_root_password: -3}"
-printf "\nMySQL User Name:     ${mysql_user_name}"
-printf "\nMySQL User Password: ***${mysql_user_password: -3}"
+printf "\nphpMyAdmin Port:     ${phpmyadmin_port}"
+printf "\nDatabase:"
+printf "\n    Type:            ${service_db}"
+printf "\n    Name:            ${db_name}"
+printf "\n    Root Password:   ***${db_root_password: -3}"
+printf "\n    Username:        ${db_username}"
+printf "\n    Password:        ***${db_password: -3}"
 printf "\n---------------------------------------------------\n\n"
 
 read -p "Hit [Enter] to continue or Ctrl-C to quit." reply
 
 # Define Docker files.
-nginx_conf_file="${project_dir}/docker-compose/nginx/${project_name}.conf"
-mysql_init_file="${project_dir}/docker-compose/mysql/init_db.sql"
+nginx_conf_file="${project_dir}/docker-compose/${service_server}/${project_name}.conf"
+mysql_init_file="${project_dir}/docker-compose/${service_db}/init_db.sql"
 docker_compose_file="${project_dir}/docker-compose.yml"
 docker_file="${project_dir}/Dockerfile"
 
@@ -349,34 +385,29 @@ elif [[ $project_framework == "CodeIgniter" ]]; then
   # CodeIgniter
   printf "\nUpdating .env file ...\n"
   docker-compose exec app sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.hostname =.*/database.default.hostname = db-mysql/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.database =.*/database.default.database = ${mysql_database}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.username =.*/database.default.username = ${mysql_user_name}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.password =.*/database.default.password = ${mysql_user_password}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.DBDriver =.*/database.default.DBDriver = MySQLi/g" "${local_project_dir}/.env"
-  #docker-compose exec app sed -i "0,/'hostname' => 'localhost'/s/'hostname' => 'localhost'/'hostname' => 'db-mysql'/" "${local_project_dir}/app/Config/Database.php"
-  #docker-compose exec app sed -i "0,/'username' => ''/s/'username' => ''/'username' => '${mysql_user_name}'/" "${local_project_dir}/app/Config/Database.php"
-  #docker-compose exec app sed -i "0,/'password' => ''/s/'password' => ''/'password' => '${mysql_user_password}'/" "${local_project_dir}/app/Config/Database.php"
-  #docker-compose exec app sed -i "0,/'database' => ''/s/'database' => ''/'database' => '${mysql_database}'/" "${local_project_dir}/app/Config/Database.php"
+  docker-compose exec app sed -i "s/# database.default.hostname =.*/database.default.hostname = db-${service_db}/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/# database.default.database =.*/database.default.database = ${db_name}/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/# database.default.username =.*/database.default.username = ${db_username}/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/# database.default.password =.*/database.default.password = ${db_password}/g" "${local_project_dir}/.env"
 elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
   # Laravel/Lumen
   printf "\nUpdating .env file ...\n"
   docker-compose exec app sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/APP_KEY=.*/APP_KEY=$(openssl rand -base64 64)/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db-mysql/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_DATABASE=.*/DB_DATABASE=${mysql_database}/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_USERNAME=.*/DB_USERNAME=${mysql_user_name}/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${mysql_user_password}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" "${local_project_dir}/.env"
 elif [[ $project_framework == "Symfony" ]]; then
   # Symfony
   printf "\nUpdating .env file ...\n"
-  docker-compose exec app echo "DB_USER=${mysql_user_name}" >> "${local_project_dir}/.local.env"
-  docker-compose exec app echo "DB_PASS=${mysql_user_password}" >> "${local_project_dir}/.local.env"
+  docker-compose exec app echo "DB_USER=${db_username}" >> "${local_project_dir}/.local.env"
+  docker-compose exec app echo "DB_PASS=${db_password}" >> "${local_project_dir}/.local.env"
 elif [[ $project_framework == "Yii" ]]; then
   # Yii
-  docker-compose exec app sed -i "s/    'dsn' => 'mysql:host=,.*/    'dsn' => 'mysql:host=localhost;dbname=${mysql_database}',/g" "${local_project_dir}/config/web.php"
-  docker-compose exec app sed -i "s/    'username' => 'root'.*/    'username' => '${mysql_user_name}',/g" "${local_project_dir}/config/web.php"
-  docker-compose exec app sed -i "s/    'password' => ''.*/    'password' => '${mysql_user_name}',/g" "${local_project_dir}/config/web.php"
+  docker-compose exec app sed -i "s/    'dsn' => '${service_db}:host=,.*/    'dsn' => '${service_db}:host=localhost;dbname=${db_name}',/g" "${local_project_dir}/config/web.php"
+  docker-compose exec app sed -i "s/    'username' => 'root'.*/    'username' => '${db_username}',/g" "${local_project_dir}/config/web.php"
+  docker-compose exec app sed -i "s/    'password' => ''.*/    'password' => '${db_username}',/g" "${local_project_dir}/config/web.php"
 fi
 
 
@@ -398,5 +429,5 @@ fi
 printf "\nIf you see any errors with the 'composer install' command then run a composer update with the command:\n"
 printf "\tdocker-compose exec app composer update\n"
 printf "\tYou can now go to http://localhost:${port} in your browser.\n"
-printf "\tYou can access phpMyAdmin at http://localhost:${phpmyadmin_port} where the server is \"db-mysql\".\n"
+printf "\tYou can access phpMyAdmin at http://localhost:${phpmyadmin_port} where the server is \"db-${service_db}\".\n"
 exit
