@@ -1,0 +1,15 @@
+
+HASH_SECRET_KEY = 'OAQoT1wiiwm8eHJEkQ4hIOR94SAcCEma'
+
+#--------------------------------------------------------------------
+# EMAIL
+#--------------------------------------------------------------------
+email.fromEmail = 'noreply@example.com'
+email.fromName = 'Task application'
+email.protocol = 'smtp'
+email.SMTPHost = 'smtp.mailgun.org'
+email.SMTPUser = 'youruser@example.com'
+email.SMTPPass = 'yourpassword'
+email.SMTPPort = '587'
+email.SMTPCrypto = 'tls'
+email.mailType = 'html'

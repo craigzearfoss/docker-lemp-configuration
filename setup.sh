@@ -1,6 +1,26 @@
 #!/bin/bash
 printf "\nCreate a PHP Development Environment\n"
 
+selected_option=-1
+while [[ selected_option -lt 1 || selected_option -gt 3 ]]; do
+  printf "\nSelect the type of project."
+  printf "\n\t1 - Web Server"
+  printf "\n\t2 - Web Server and Fake SMTP (MailHog)"
+  printf "\n\t3 - Fake SMTP (MailHog) only"
+  printf "\n"
+  read selected_option
+  selected_option="$((selected_option))"
+done
+if [[ "$selected_option" -eq 2 ]] || [[ "$selected_option" -eq 3 ]]; then
+  printf "\nSetting up fake-smtp-mailhog container ...\n"
+  cd configurations/docker-compose-files/mailhog
+  docker-compose up -d mailhog
+  printf "\nMailHog container has been created as fake-smtp-mailhog:\n"
+  if [[ "$selected_option" -eq 3 ]] ; then
+    exit
+  fi
+fi
+
 docker_version="3.7"
 docker_compose_yml_version="nginx-mysql"
 dockerfile_filename="php-7-4-fpm"
@@ -336,7 +356,7 @@ if [ -z "$git_repo" ]; then
     printf "\nCreating CodeIgniter project ...\n"
     docker-compose exec app composer create-project codeigniter4/appstarter "${project_name}"
     docker-compose exec app cp "${local_project_dir}/env" "${local_project_dir}/.env"
-
+    docker-compose exec app cat "${working_dir}/configurations/env-sections/CodeIgniter" >>  "${local_project_dir}/.env"
   elif [[ $project_framework == "Laravel" ]]; then
     # Laravel
     printf "\nCreating Laravel project ...\n"
@@ -389,6 +409,8 @@ elif [[ $project_framework == "CodeIgniter" ]]; then
   docker-compose exec app sed -i "s/# database.default.database =.*/database.default.database = ${db_name}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/# database.default.username =.*/database.default.username = ${db_username}/g" "${local_project_dir}/.env"
   docker-compose exec app sed -i "s/# database.default.password =.*/database.default.password = ${db_password}/g" "${local_project_dir}/.env"
+  docker-compose exec app sed -i "s/HASH_SECRET_KEY =.*/HASH_SECRET_KEY = dasgfasgdfsgdfshdh/g" "${local_project_dir}/.env"
+  #tr -dc A-Za-z0-9 </dev/urandom | head -c 13 ; echo ''
 elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
   # Laravel/Lumen
   printf "\nUpdating .env file ...\n"
