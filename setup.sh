@@ -45,6 +45,7 @@ db_name=${project_name//[\-]/_}
 db_root_password=
 db_username=
 db_password=
+db_exposed_port=6603
 default_full_install="Y"
 full_install=${default_full_install}
 run_migrations="Y"
@@ -119,6 +120,7 @@ create_docker_containers() {
   sed -i "s/{{project_name}}/${project_name}/g" ${docker_compose_file}
   sed -i "s/{{port}}/${port}/g" ${docker_compose_file}
   sed -i "s/{{phpmyadmin_port}}/${phpmyadmin_port}/g" ${docker_compose_file}
+  sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" ${docker_compose_file}
 
   # Copy Dockerfile.
   printf "Copying Dockerfile file ...\n"
@@ -272,9 +274,22 @@ if [ -d "project_base_dir" ]; then
 fi
 
 # Get the port.
-read -p "Port [${default_port}]: " port
-port=${port:-${default_port}}
+port_is_in_use="Y"
+select_a_port_prompt="Select a port [${default_port}]: "
+while [[ "${port_is_in_use}" == "Y" ]]; do
+  read -p "${select_a_port_prompt}" port
+  port=${port:-${default_port}}
+  if [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
+    select_a_port_prompt="Port ${port} is in use. Select a different port [${default_port}]: "
+    port_is_in_use="Y"
+  else
+    port_is_in_use="N"
+  fi
+done
 phpmyadmin_port=$(($port + 1))
+while [[ $(nc -w5 -z -v localhost "${phpmyadmin_port}" 2>&1) == *"succeeded"* ]]; do
+  phpmyadmin_port=$(($phpmyadmin_port + 1))
+done
 
 # Get database type
 selected_option=-1
@@ -288,10 +303,17 @@ while [[ selected_option -lt 1 || selected_option -gt 2 ]]; do
 done
 if [[ "$selected_option" -eq 1 ]]; then
   service_db="mysql"
+  db_exposed_port=6603
 fi
 if [[ "$selected_option" -eq 2 ]]; then
   service_db="postgres"
+  db_exposed_port=6603
 fi
+
+# If the exposed port for the db is in use than keep incrementing it until we find an open port.
+while [[ $(nc -w5 -z -v localhost "${db_exposed_port}" 2>&1) == *"succeeded"* ]]; do
+  db_exposed_port=$((${db_exposed_port} + 1))
+done
 
 # Get database user credentials.
 db_root_password=
@@ -310,21 +332,21 @@ while [ -z "$db_password" ]; do
 done
 
 printf "\n---------------------------------------------------"
-printf "\nProject Name:        ${project_name}"
-printf "\nProject Framework:   ${project_framework}"
+printf "\nProject name:        ${project_name}"
+printf "\nProject framework:   ${project_framework}"
 if [[ $project_framework == "Symfony" ]]; then
-  printf "\nFull Install:        ${project_framework}"
+  printf "\nFull install:        ${project_framework}"
 fi
-printf "\nProject Dir:         ${project_base_dir}"
-printf "\nGit Repo:            ${git_repo}"
-#printf "\nWorking Dir:         ${working_dir}"
-#printf "\nBase Dir:            ${base_dir}"
+printf "\nProject directory:   ${project_base_dir}"
+printf "\nGit repository:      ${git_repo}"
+#printf "\nWorking directory:   ${working_dir}"
+#printf "\nBase directory:      ${base_dir}"
 printf "\nPort:                ${port}"
-printf "\nphpMyAdmin Port:     ${phpmyadmin_port}"
+printf "\nphpMyAdmin port:     ${phpmyadmin_port}"
 printf "\nDatabase:"
 printf "\n    Type:            ${service_db}"
 printf "\n    Name:            ${db_name}"
-printf "\n    Root Password:   ***${db_root_password: -3}"
+printf "\n    Root password:   ***${db_root_password: -3}"
 printf "\n    Username:        ${db_username}"
 printf "\n    Password:        ***${db_password: -3}"
 printf "\n---------------------------------------------------\n\n"
