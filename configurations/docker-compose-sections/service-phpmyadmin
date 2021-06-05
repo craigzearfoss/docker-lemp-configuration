@@ -2,14 +2,14 @@
     image: phpmyadmin/phpmyadmin
     container_name: {{project_name}}-phpmyadmin
     environment:
-      PMA_HOST: db-mysql
+      PMA_HOST: db-{{service_db}}
       PMA_PORT: 3306
       PMA_ARBITRARY: 1
     restart: always
     networks:
       - {{project_name}}
     depends_on:
-      - db-mysql
+      - db-{{service_db}}
     ports:
-      - {{phpmyadmin_port}}:80
+      - {{db_admin_port}}:80
 

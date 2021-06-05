@@ -14,17 +14,40 @@ if [[ "${reply^^}" != "Y" ]]; then
   exit
 fi
 
-container_suffixes=("app" "nginx" "mysql" "phpmyadmin")
-for suffix in "${container_suffixes[@]}";
-do
-  printf "\nKilling container ${docker_env}-${suffix} ...\n\t"
-  docker kill "${docker_env}-${suffix}"
-done
 
-printf "\nPruning Docker images ...\n\t"
-docker system prune -f
+if [[ "$docker_env}" == "fake-smtp-mailhog" ]]; then
 
-printf "\nRemoving image ${docker_env} ...\n\t"
-docker image rm "${docker_env}"
+  container_name="$docker_env"
+  printf "\nKilling container ${container_name} ...\n\t"
+  docker kill "${container_name}"
+
+  printf "\nPruning Docker images ...\n\t"
+  docker system prune -f
+
+  printf "\nRemoving image ${container_name} ...\n\t"
+  docker image rm "${container_name}"
+
+  printf "\nThe MailHog container fake-smtp-mail has been destroyed.\n\t"
+
+else
+
+  # No container name parameter passed
+  container_suffixes=("app" "nginx" "mysql" "mariadb" "postgres" "phpmyadmin" "pgadmin")
+  for suffix in "${container_suffixes[@]}";
+  do
+    printf "\nKilling container ${docker_env}-${suffix} ...\n\t"
+    docker kill "${docker_env}-${suffix}"
+  done
+
+  printf "\nPruning Docker images ...\n\t"
+  docker system prune -f
+
+  printf "\nRemoving image ${docker_env} ...\n\t"
+  docker image rm "${docker_env}"
+
+  printf "\nAll containers for ${docker_env} have been destroyed.\n\t"
+  printf "\nIf you want to destroy the mailhog container run the following command:"
+  printf "\n\tbash destroy.sh fake-smtp-mailhog"
+fi
 
 printf "\nDONE"

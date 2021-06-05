@@ -1,0 +1,29 @@
+  db-postgres:
+    image: postgres
+    container_name: {{project_name}}-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: test_db
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    ports:
+      - "{{db_exposed_port}}:5432"
+    volumes:
+      - ./docker-compose/postgres:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - {{project_name}}
+
+  pgadmin:
+    container_name: {{project_name}}_pgadmin4
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "{{db_admin_port}}:80"
+
