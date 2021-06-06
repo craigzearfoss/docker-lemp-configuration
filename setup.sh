@@ -33,67 +33,6 @@ full_install=${default_full_install}
 run_db_migrations="Y"
 run_db_seeds="Y"
 
-# Are we installing mailhog
-selected_option=-1
-while [[ selected_option -lt 1 || selected_option -gt 3 ]]; do
-  printf "\nSelect the type of project."
-  printf "\n\t1 - Web Server"
-  printf "\n\t2 - Web Server and Fake SMTP (MailHog)"
-  printf "\n\t3 - Fake SMTP (MailHog) only"
-  printf "\n"
-  read selected_option
-  selected_option="$((selected_option))"
-done
-if [[ "$selected_option" -eq 2 ]] || [[ "$selected_option" -eq 3 ]]; then
-  create_mailhog_container="Y"
-  if [[ "$selected_option" -eq 3 ]] ; then
-  printf "\nCreating up fake-smtp-mailhog container ...\n"
-    cd configurations/docker-compose-files/mailhog
-    docker-compose up -d mailhog
-    printf "\nMailHog container has been created as fake-smtp-mailhog:\n"
-    exit
-  fi
-else
-  create_mailhog_container="N"
-fi
-
-# Create an array of available Docker files.
-declare -a docker_files
-basename "${working_dir}/configurations/Dockerfiles"
-selected_docker_file_index=
-cnt=1
-for filepath in "${working_dir}/configurations/Dockerfiles/"*
-do
-  filename="$(basename $filepath)"
-  docker_files[$cnt]="${filename}"
-  if [[ $filename == $dockerfile_filename ]]; then
-    selected_docker_file_index=$cnt
-  fi
-  cnt=$((${cnt} + 1))
-done
-
-# Set which Docker file to use.
-printf "\nAvailable Docker files:\n"
-for k in "${!docker_files[@]}"; do
-  printf "\t"
-  echo $k - "${docker_files[$k]}"
-done
-valid_docker_file=false
-echo "selected_docker_file_index:$selected_docker_file_index"
-while [ "$valid_docker_file" != true ]; do
-  read -p "Docker file [${selected_docker_file_index}]: " response
-  if [ -z "$response" ]; then
-    response=$selected_docker_file_index
-  else
-    response="$((response))"
-  fi
-  if [[ "$response" -gt 0 ]] && [[ "$response" -le ${#docker_files[@]} ]]; then
-    selected_docker_file_index=$response
-    dockerfile_filename="${docker_files[selected_docker_file_index]}"
-    valid_docker_file=true
-  fi
-done
-
 create_docker_containers() {
   printf "\nCopying configuration files ...\n"
   cd "${project_dir}"
@@ -176,7 +115,7 @@ create_docker_containers() {
   # Add superuser create to init.sql file
   if [[ "${service_db}" == "mysql" ]] || [[ "${service_db}" == "mariadb" ]]; then
     echo "CREATE DATABASE FLUSH ${db_name};" >> ${init_db_file}
-    echo "CREATE USER '${db_username}'@'localhost' IDENTIFIED BY \"${db_password}\";" >> ${init_db_file}
+    echo "CREATE USER \"${db_username}'@'localhost' IDENTIFIED BY \"${db_password}\";" >> ${init_db_file}
     echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'localhost' WITH GRANT OPTION;" >> ${init_db_file}
     echo "CREATE USER '${db_username}'@'%' IDENTIFIED BY \"${db_password}\";" >> ${init_db_file}
     echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'%' WITH GRANT OPTION;" >> ${init_db_file}
@@ -187,23 +126,78 @@ create_docker_containers() {
     echo "grant all privileges on database ${db_name} to ${db_username};" >> ${init_db_file}
   fi
 
+  # Copy bash scripts (and set variable values).
+  printf "\nCopying bash script files ...\n"
+  mkdir "${project_dir}/scripts/"
+  cp -r "${working_dir}/scripts/" "${project_dir}"
+  for bash_script in "${project_dir}"/scripts/*.sh; do
+    sed -i "s/{{project_name}}/${project_name}/g" "${bash_script}"
+    sed -i "s#{{local_project_dir}}#${local_project_dir}#g" "${bash_script}"
+  done
+
   printf "Building Docker containers ...\n"
   docker-compose build
   docker-compose up -d
   docker-compose ps
 
-  #printf "Installing composer ...\n"
-  #docker-compose exec app composer install
-
   # Remove init.sql setup file.
-  ####rm "${init_db_file}"
+  ###rm "${init_db_file}"
 }
+
+# Prompt for the type of project. (Are we including MailHog?)
+printf "\nSelect the type of project: [1]"
+printf "\n\t1 - Web Server"
+printf "\n\t2 - Web Server and Fake SMTP (MailHog)"
+printf "\n\t3 - Fake SMTP (MailHog) only"
+printf "\n"
+selected_option=0
+while [[ selected_option -lt 1 || selected_option -gt 3 ]]; do
+  read selected_option
+  if [ -z "$selected_option" ]; then
+    selected_option=1
+  fi
+  selected_option="$((selected_option))"
+done
+if [[ "$selected_option" -eq 2 ]] || [[ "$selected_option" -eq 3 ]]; then
+  selected_option="$((selected_option))"
+  create_mailhog_container="Y"
+  if [[ "$selected_option" -eq 3 ]] ; then
+  printf "\nCreating up fake-smtp-mailhog container ...\n"
+    cd configurations/docker-compose-files/mailhog
+    docker-compose up -d mailhog
+    printf "\nMailHog container has been created as fake-smtp-mailhog:\n"
+    exit
+  fi
+else
+  create_mailhog_container="N"
+fi
+
+# Prompt for which Dockerfile to use.
+printf "\nSelect Docker file: [1]"
+declare -a dockerfiles
+files=("${working_dir}"/configurations/Dockerfiles/*)
+cnt=1
+for ((i=${#files[@]}-1; i>=0; i--)); do
+  dockerfiles[$cnt]="${files[$i]##*/}"
+  printf "\n\t${cnt} - ${dockerfiles[$cnt]}"
+  cnt=$((${cnt} + 1))
+done
+printf "\n"
+selected_option=0
+while [[ selected_option -lt 1 || selected_option -gt "${cnt}" ]]; do
+  read selected_option
+  if [ -z "$selected_option" ]; then
+    selected_option=1
+  fi
+done
+dockerfile_filename="${dockerfiles[selected_option]}"
 
 # Get the project name.
 if [ -z "$project_name" ]; then
+  printf "\nProject name (Can only contain letters, numbers, underscores and dashes.): "
   valid_project_name=false
   while [ "$valid_project_name" != true ]; do
-    read -p "Project name (Can only contain letters, numbers, underscores and dashes.): " project_name
+    read  project_name
     if [[ $project_name =~ ^[A-Za-z0-9_-]+$ ]]; then
       valid_project_name=true
     else
@@ -216,63 +210,71 @@ local_project_dir="/var/www/${project_name}"
 db_name=${project_name//[\-]/_}
 
 # Get the git repo. (If there is one.)
-read -p "Git repository (Leave blank for none.): " git_repo
+repo_okay=false
+printf "\nGit repository (Leave blank for none.): \n"
+while [ "$repo_okay" != true ]; do
+  read git_repo
+  if [ -z "$git_repo" ]; then
+    repo_okay=true
+  else
+    if (git ls-remote "${git_repo}" -q 2>&1); then
+      repo_okay=true
+    else
+      printf "\nEnter a different git repository or leave blank to create a new project.\n"
+      git_repo=
+    fi
+  fi
+done
 
-# Get the type of project
+# Get the project framework.
+printf "\nSelect the project framework."
+#printf "\n\t1 - CakePHP"
+printf "\n\t2 - CodeIgniter"
+printf "\n\t3 - Laravel"
+printf "\n\t4 - Lumen"
+#printf "\n\t5 - Symfony"
+#printf "\n\t6 - WordPress"
+#printf "\n\t7 - Yii"
+#printf "\n\t8 - Zend"
+printf "\n"
 selected_option=-1
 while [[ selected_option -lt 1 || selected_option -gt 8 ]]; do
-  printf "\nSelect the type of project."
-  printf "\n\t1 - CakePHP"
-  printf "\n\t2 - CodeIgniter"
-  printf "\n\t3 - Laravel"
-  printf "\n\t4 - Lumen"
-  printf "\n\t5 - Symfony"
-  printf "\n\t6 - WordPress"
-  printf "\n\t7 - Yii"
-  printf "\n\t8 - Zend"
-  printf "\n"
   read selected_option
   selected_option="$((selected_option))"
 done
 
 if [[ "$selected_option" -eq 1 ]]; then
   project_framework="CakePHP"
-fi
-if [[ "$selected_option" -eq 2 ]]; then
+elif [[ "$selected_option" -eq 2 ]]; then
   project_framework="CodeIgniter"
-fi
-if [[ "$selected_option" -eq 3 ]]; then
+elif [[ "$selected_option" -eq 3 ]]; then
   project_framework="Laravel"
-fi
-if [[ "$selected_option" -eq 4 ]]; then
+elif [[ "$selected_option" -eq 4 ]]; then
   project_framework="Lumen"
-fi
-if [[ "$selected_option" -eq 5 ]]; then
+elif [[ "$selected_option" -eq 5 ]]; then
   project_framework="Symfony"
-fi
-if [[ "$selected_option" -eq 6 ]]; then
+elif [[ "$selected_option" -eq 6 ]]; then
   project_framework="WordPress"
-fi
-if [[ "$selected_option" -eq 7 ]]; then
+elif [[ "$selected_option" -eq 7 ]]; then
   project_framework="Yii"
-fi
-if [[ "$selected_option" -eq 8 ]]; then
+elif [[ "$selected_option" -eq 8 ]]; then
   project_framework="Zend"
 fi
-
-unimplemented_frameworks=("WordPress Zend")
+unimplemented_frameworks=("CakePHP Symfony WordPress Yii Zend")
 if [[ " ${unimplemented_frameworks[@]} " =~ " ${project_framework} " ]]; then
     printf "Sorry, ${project_framework} has not been implemented yet.\n"
     exit
 fi
+printf "\n"
 
 # Is this a full install?
 frameworks_with_partial_installs=("Symfony")
 if [[ " ${frameworks_with_partial_installs[@]} " =~ " ${project_framework} " ]]; then
+  printf "\nIs this a full install [${default_full_install}]?"
   valid_replies=("Y N")
   good_reply=false
   while [ "$good_reply" != true ]; do
-    read -p "Full install [${default_full_install}]: " full_install
+    read full_install
     full_install=${full_install:-${default_full_install}}
     full_install=${full_install^^}
     if [[ " ${valid_replies[@]} " =~ " ${full_install} " ]]; then
@@ -282,18 +284,18 @@ if [[ " ${frameworks_with_partial_installs[@]} " =~ " ${project_framework} " ]];
 fi
 
 # Get the project directory.
-read -p "Project directory [${project_base_dir}]: " custom_base_dir
+printf "Project directory [${project_base_dir}]: \n"
+read custom_base_dir
 custom_base_dir=${custom_base_dir:-${project_base_dir}}
 project_base_dir=$custom_base_dir
 project_dir="${project_base_dir}/${project_name}"
 
-# Make sure the project directory does not already exist.
+# Verify that directories do not already exist.
 if [ -d $project_dir ]; then
   printf "\nThe directory ${project_dir} already exists.\n"
   exit
 fi
-# Make sure the project base directory exists.
-if [ -d "project_base_dir" ]; then
+if [ ! -d $project_base_dir ]; then
   printf "\nThe project base directory ${project_base_dir} does not exist.  Please create it and rerun this script.\n"
   exit
 fi
@@ -302,30 +304,28 @@ fi
 port_is_in_use="Y"
 select_a_port_prompt="Select a port [${default_port}]: "
 while [[ "${port_is_in_use}" == "Y" ]]; do
-  read -p "${select_a_port_prompt}" port
+  printf "${select_a_port_prompt}\n"
+  read port
   port=${port:-${default_port}}
-  if [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
+  if [[ "$port" -lt 1024 ||"$port" -gt 65535 ]]; then
+    select_a_port_prompt="A port must be in the range 1024 to 65535. Select a different port [${default_port}]: "
+
+  elif [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
     select_a_port_prompt="Port ${port} is in use. Select a different port [${default_port}]: "
     port_is_in_use="Y"
   else
     port_is_in_use="N"
   fi
 done
-# Set the port for the database admin program (phpMyAdmin, pgAdmin, etc.).
-# Make sure the port is available.
-db_admin_port=$(($port + 1))
-while [[ $(nc -w5 -z -v localhost "${db_admin_port}" 2>&1) == *"succeeded"* ]]; do
-  db_admin_port=$((db_admin_port + 1))
-done
 
 # Get database type
+printf "\nSelect the type of database:"
+printf "\n\t1 - MySQL"
+printf "\n\t2 - MariaDB"
+printf "\n\t3 - Postgres"
+printf "\n"
 selected_option=-1
 while [[ selected_option -lt 1 || selected_option -gt 3 ]]; do
-  printf "\nSelect the type of database:"
-  printf "\n\t1 - MySQL"
-  printf "\n\t2 - MariaDB"
-  printf "\n\t3 - Postgres"
-  printf "\n"
   read selected_option
   selected_option="$((selected_option))"
 done
@@ -342,8 +342,13 @@ elif [[ "$selected_option" -eq 3 ]]; then
   db_admin_app="pgAdmin"
   db_exposed_port=5432
 fi
+# Set the port for the database admin program (phpMyAdmin, pgAdmin, etc.).  (Make sure the port is available.)
+db_admin_port=$(($port + 1))
+while [[ $(nc -w5 -z -v localhost "${db_admin_port}" 2>&1) == *"succeeded"* ]]; do
+  db_admin_port=$((db_admin_port + 1))
+done
 
-# If the exposed port for the db is in use then keep incrementing it until we find an open port.
+# If the exposed port for the database is in use then keep incrementing it until we find an open port.
 while [[ $(nc -w5 -z -v localhost "${db_exposed_port}" 2>&1) == *"succeeded"* ]]; do
   db_exposed_port=$((${db_exposed_port} + 1))
 done
@@ -355,6 +360,7 @@ while [ -z "$db_root_password" ]; do
 done
 
 db_username=
+valid_username=false
 while [ -z "$db_username" ]; do
   read -p "Enter database username: " db_username
 done
@@ -419,7 +425,6 @@ if [ -z "$git_repo" ]; then
     printf "\nCreating CodeIgniter project ...\n"
     docker-compose exec app composer create-project codeigniter4/appstarter "${project_name}"
     docker-compose exec app cp "${local_project_dir}/env" "${local_project_dir}/.env"
-    #docker-compose exec app cat "${working_dir}/configurations/env-sections/CodeIgniter" >>  "${local_project_dir}/.env"
     cat "${working_dir}/configurations/env-sections/CodeIgniter" >>  "${project_dir}/${project_name}/.env"
 
     #docker-compose exec app cp "${local_project_dir}/.env.example" "${local_project_dir}/.env"
@@ -453,11 +458,10 @@ if [ -z "$git_repo" ]; then
 
 else
 
-  printf "\nDownloading git repo ${git_repo} ...\n"
+  printf "\nDownloading and installing git repo ${git_repo} ...\n"
   docker-compose exec app git clone $git_repo $project_name
-  docker-compose exec app cd "${local_project_dir}" | composer update
-  docker-compose exec app cp "${local_project_dir}/.env.example" "${local_project_dir}/.env"
-
+  docker-compose exec app cp "${local_project_dir}/env" "${local_project_dir}/.env"
+  docker exec -t cdz2-app bash /var/www/scripts/composer_update.sh
 fi
 
 # Update configuration files.
@@ -469,18 +473,18 @@ if [[ $project_framework == "CakePHP" ]]; then
 elif [[ $project_framework == "CodeIgniter" ]]; then
   # CodeIgniter
   printf "\nUpdating .env file and configuration settings ...\n"
-  docker-compose exec app sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.hostname =.*/database.default.hostname = db-${service_db}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.database =.*/database.default.database = ${db_name}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.username =.*/database.default.username = ${db_username}/g" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/# database.default.password =.*/database.default.password = ${db_password}/g" "${local_project_dir}/.env"
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/# database.default.hostname =.*/database.default.hostname = db-${service_db}/g" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/# database.default.database =.*/database.default.database = ${db_name}/g" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/# database.default.username =.*/database.default.username = ${db_username}/g" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/# database.default.password =.*/database.default.password = '${db_password}'/g" .env
   hash=$(dd if=/dev/urandom bs=1 count=32 2>/dev/null | base64 -w 0 | rev | cut -b 2- | rev 2>&1)
   hash=$(echo -n $hash | md5sum | cut -c 1-32)
-  docker-compose exec app sed -i "s/HASH_SECRET_KEY =.*/HASH_SECRET_KEY = \'${hash}\'/" "${local_project_dir}/.env"
-  #        public $baseURL = 'http://localhost:8080/';
-  docker-compose exec app sed -i "s/.*public \$baseURL =.*/        public \$baseURL = \'http:\/\/localhost:${port}\/\';/" "${local_project_dir}/app/Config/App.php"
-  #        public $indexPage = 'index.php';
-  docker-compose exec app sed -i "s/.*public \$indexPage =.*/        public \$indexPage = \'\';/" "${local_project_dir}/app/Config/App.php"
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/HASH_SECRET_KEY =.*/HASH_SECRET_KEY = \'${hash}\'/" .env
+  if [ -z "$git_repo" ]; then
+    docker exec -w "${local_project_dir}/app/Config" "${project_name}-app" sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" App.php
+    docker exec -w "${local_project_dir}/app/Config" "${project_name}-app" sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g" App.php
+  fi
 elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
   # Laravel/Lumen
   printf "\nUpdating .env file and configuration settings ...\n"
@@ -507,16 +511,36 @@ fi
 # Run post install processes.
 #docker restart "${project_name}-app"
 
-if [[ $project_framework == "Laravel" ]]; then
-  docker-compose exec app php "${local_project_dir}/artisan" optimize:clear
+if [[ $project_framework == "CodeIgniter" ]]; then
+
   if [[ $run_db_migrations == "Y" ]]; then
-    docker-compose exec app php "${local_project_dir}/artisan" migrate
+    printf "\nRunning database migrations ..."
+    docker exec -w "${local_project_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
   fi
+  if [[ $run_db_seeds == "Y" ]]; then
+    printf "\nRunning database seeds ..."
+    docker exec -w "${local_project_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-db-seed.sh"
+  fi
+
+elif [[ $project_framework == "Laravel" ]]; then
+
+  docker exec -t "${project_name}-app" bash /var/www/scripts/laravel-clear_cache.sh
+  if [[ $run_db_migrations == "Y" ]]; then
+    printf "\nRunning database migrations ..."
+    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-migrate.sh
+  fi
+  if [[ $run_db_seeds == "Y" ]]; then
+    printf "\nRunning database seeds ..."
+    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-db-seed.sh
+  fi
+
 elif [[ $project_framework == "Lumen" ]]; then
+
   docker-compose exec app php "${local_project_dir}/artisan" cache:clear
   if [[ $run_db_migrations == "Y" ]]; then
     docker-compose exec app php "${local_project_dir}/artisan" migrate
   fi
+
 fi
 
 printf "\nYou can now access the following in you browser:"
