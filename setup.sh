@@ -25,13 +25,18 @@ db_name=${project_name//[\-]/_}
 db_root_password=
 db_username=
 db_password=
+db_port=3306
 db_exposed_port=6603
 db_admin_app="phpMyAdmin"
 db_admin_port=8001
 default_full_install="Y"
 full_install=${default_full_install}
+frameworks_with_db_migrations=("CodeIgniter" "Laravel")
 run_db_migrations="Y"
+default_run_db_migrations=${run_db_migrations}
+frameworks_with_db_seeds=("CodeIgniter" "Laravel")
 run_db_seeds="Y"
+default_run_db_seeds=${run_db_seeds}
 
 create_docker_containers() {
   printf "\nCopying configuration files ...\n"
@@ -232,7 +237,7 @@ printf "\nSelect the project framework."
 printf "\n\t2 - CodeIgniter"
 printf "\n\t3 - Laravel"
 printf "\n\t4 - Lumen"
-#printf "\n\t5 - Symfony"
+printf "\n\t5 - Symfony"
 #printf "\n\t6 - WordPress"
 #printf "\n\t7 - Yii"
 #printf "\n\t8 - Zend"
@@ -309,7 +314,6 @@ while [[ "${port_is_in_use}" == "Y" ]]; do
   port=${port:-${default_port}}
   if [[ "$port" -lt 1024 ||"$port" -gt 65535 ]]; then
     select_a_port_prompt="A port must be in the range 1024 to 65535. Select a different port [${default_port}]: "
-
   elif [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
     select_a_port_prompt="Port ${port} is in use. Select a different port [${default_port}]: "
     port_is_in_use="Y"
@@ -331,14 +335,17 @@ while [[ selected_option -lt 1 || selected_option -gt 3 ]]; do
 done
 if [[ "$selected_option" -eq 1 ]]; then
   service_db="mysql"
+  db_port=3306
   db_admin_app="phpMyAdmin"
   db_exposed_port=6603
 elif [[ "$selected_option" -eq 2 ]]; then
   service_db="mariadb"
+  db_port=3306
   db_admin_app="phpMyAdmin"
   db_exposed_port=6603
 elif [[ "$selected_option" -eq 3 ]]; then
   service_db="postgres"
+  db_port=5432
   db_admin_app="pgAdmin"
   db_exposed_port=5432
 fi
@@ -353,24 +360,70 @@ while [[ $(nc -w5 -z -v localhost "${db_exposed_port}" 2>&1) == *"succeeded"* ]]
   db_exposed_port=$((${db_exposed_port} + 1))
 done
 
-# Get database user credentials.
+# Get database root password.
+printf "\nEnter database root password: \n"
 db_root_password=
 while [ -z "$db_root_password" ]; do
-  read -p "Enter database root password: " db_root_password
+  read db_root_password
 done
 
+# Get database username.
 db_username=
 valid_username=false
-while [ -z "$db_username" ]; do
-  read -p "Enter database username: " db_username
+while [ "$valid_username" = false ]; do
+  printf "\nEnter database username: \n"
+  read db_username
+  if [ -z "$db_username" ]; then
+    valid_username=false
+  elif [[ !($db_username =~ ^[A-Za-z0-9_-]+$) ]]; then
+    printf "\nUser name an only contain alphanumeric characters, underscores and dashes.)"
+    valid_username=false
+  elif [[ $(expr length "$db_username") -gt 20 ]]; then
+    printf "\nUser name can be no longer than 20 characters."
+    valid_username=false
+  else
+    valid_username=true
+  fi
 done
 
+# Get database user password.
+printf "\nEnter database user password: \n"
 db_password=
 while [ -z "$db_password" ]; do
-  read -p "Enter database user password: " db_password
+  read db_password
 done
 
-printf "\n---------------------------------------------------"
+# Should we run database migrations?
+if [[ " ${frameworks_with_db_migrations[@]} " =~ " ${project_framework} " ]]; then
+  printf "\nRun database migrations [${default_run_db_migrations}]?"
+  valid_replies=("Y N")
+  good_reply=false
+  while [ "$good_reply" != true ]; do
+    read run_db_migrations
+    run_db_migrations=${run_db_migrations:-${default_run_db_migrations}}
+    run_db_migrations=${run_db_migrations^^}
+    if [[ " ${valid_replies[@]} " =~ " ${run_db_migrations} " ]]; then
+      good_reply=true
+    fi
+  done
+fi
+
+# Should we run database seeders?
+if [[ " ${frameworks_with_db_seeds[@]} " =~ " ${project_framework} " ]]; then
+  printf "\nRun database seeders [${default_run_db_seeds}]?"
+  valid_replies=("Y N")
+  good_reply=false
+  while [ "$good_reply" != true ]; do
+    read run_db_seeds
+    run_db_seeds=${run_db_seeds:-${default_run_db_seeds}}
+    run_db_seeds=${run_db_seeds^^}
+    if [[ " ${valid_replies[@]} " =~ " ${run_db_seeds} " ]]; then
+      good_reply=true
+    fi
+  done
+fi
+
+printf "\n-----------------------------------------------------------"
 printf "\nProject name:        ${project_name}"
 printf "\nProject framework:   ${project_framework}"
 if [[ $project_framework == "Symfony" ]]; then
@@ -392,7 +445,13 @@ printf "\n    Name:            ${db_name}"
 printf "\n    Root password:   ***${db_root_password: -3}"
 printf "\n    Username:        ${db_username}"
 printf "\n    Password:        ***${db_password: -3}"
-printf "\n---------------------------------------------------\n\n"
+if [[ " ${frameworks_with_db_migrations[@]} " =~ " ${project_framework} " ]]; then
+  printf "\n    Run migrations:  ${run_db_migrations}"
+fi
+if [[ " ${frameworks_with_db_seeds[@]} " =~ " ${project_framework} " ]]; then
+  printf "\n    Run db seeds:    ${run_db_seeds}"
+fi
+printf "\n-----------------------------------------------------------\n\n"
 
 read -p "Hit [Enter] to continue or Ctrl-C to quit." reply
 
@@ -415,30 +474,35 @@ create_docker_containers
 if [ -z "$git_repo" ]; then
 
   if [[ $project_framework == "CakePHP" ]]; then
+
     # CakePHP
     printf "\nCreating CakePHP project ...\n"
     docker-compose exec app composer create-project --prefer-dist cakephp/app:~4.0 "${project_name}"
     docker-compose exec app cp "${local_project_dir}/config/.env.example" "${local_project_dir}/config/.env"
 
   elif [[ $project_framework == "CodeIgniter" ]]; then
+
     # CodeIgniter
     printf "\nCreating CodeIgniter project ...\n"
     docker-compose exec app composer create-project codeigniter4/appstarter "${project_name}"
     docker-compose exec app cp "${local_project_dir}/env" "${local_project_dir}/.env"
+    docker exec -w "${local_project_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-initialize_env_file.sh"
     cat "${working_dir}/configurations/env-sections/CodeIgniter" >>  "${project_dir}/${project_name}/.env"
 
-    #docker-compose exec app cp "${local_project_dir}/.env.example" "${local_project_dir}/.env"
   elif [[ $project_framework == "Laravel" ]]; then
+
     # Laravel
     printf "\nCreating Laravel project ...\n"
     docker-compose exec app composer create-project laravel/laravel "${project_name}"
 
   elif [[ $project_framework == "Lumen" ]]; then
+
     # Lumen
     printf "\nCreating Lumen project ...\n"
     docker-compose exec app composer create-project --prefer-dist laravel/lumen "${project_name}"
 
   elif [[ $project_framework == "Symfony" ]]; then
+
     # Symfony
     printf "\nCreating Symfony project ...\n"
     if [ "$full_install" == "Y"]; then
@@ -448,6 +512,7 @@ if [ -z "$git_repo" ]; then
     fi
 
   elif [[ $project_framework == "Yii" ]]; then
+
     # Yii
     docker-compose exec app composer create-project --prefer-dist yiisoft/yii2-app-basic "$project_name"
 
@@ -458,19 +523,23 @@ if [ -z "$git_repo" ]; then
 
 else
 
-  printf "\nDownloading and installing git repo ${git_repo} ...\n"
-  docker-compose exec app git clone $git_repo $project_name
-  docker-compose exec app cp "${local_project_dir}/env" "${local_project_dir}/.env"
-  docker exec -t cdz2-app bash /var/www/scripts/composer_update.sh
+  # Clone git repository.
+  docker exec -w /var/www/scripts "${project_name}-app" bash "git_clone.sh ${git_repo} ${project_name}"
+  #docker exec -it "${project_name}-app" bash - c bash /var/www/scripts/git_clone.sh "${git_repo}" "${project_name}"
+  docker exec -w /var/www/scripts "${project_name}-app" bash composer_update.sh
+
 fi
 
 # Update configuration files.
 if [[ $project_framework == "CakePHP" ]]; then
+
   # CakePHP
   printf "\nUpdating .env file and configuration settings ...\n"
   docker-compose exec app sed -i "s/export APP_NAME=.*/export APP_NAME=\"${project_name}\"/g" "${local_project_dir}/config/.env"
   docker-compose exec app sed -i "s/export SECURITY_SALT=.*/export SECURITY_SALT=\"$(openssl rand -base64 6)\"/g" "${local_project_dir}/config/.env"
+
 elif [[ $project_framework == "CodeIgniter" ]]; then
+
   # CodeIgniter
   printf "\nUpdating .env file and configuration settings ...\n"
   docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" .env
@@ -485,26 +554,36 @@ elif [[ $project_framework == "CodeIgniter" ]]; then
     docker exec -w "${local_project_dir}/app/Config" "${project_name}-app" sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" App.php
     docker exec -w "${local_project_dir}/app/Config" "${project_name}-app" sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g" App.php
   fi
+
 elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
+
   # Laravel/Lumen
   printf "\nUpdating .env file and configuration settings ...\n"
-  docker-compose exec app sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/APP_KEY=.*/APP_KEY=$(openssl rand -base64 64)/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" "${local_project_dir}/.env"
-  docker-compose exec app sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" "${local_project_dir}/.env"
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/APP_ENV=.*/APP_ENV=local/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" php artisan key:generate
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/APP_URL=.*/APP_URL=http:\/\/localhost:${port}/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/DB_PORT=.*/DB_PORT=${db_port}/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" .env
+  docker exec -w "${local_project_dir}" "${project_name}-app" sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" .env
+
 elif [[ $project_framework == "Symfony" ]]; then
+
   # Symfony
   printf "\nUpdating .env file and configuration settings ...\n"
   docker-compose exec app echo "DB_USER=${db_username}" >> "${local_project_dir}/.local.env"
   docker-compose exec app echo "DB_PASS=${db_password}" >> "${local_project_dir}/.local.env"
+
 elif [[ $project_framework == "Yii" ]]; then
+
   # Yii
   printf "\nUpdating configuration settings ...\n"
   docker-compose exec app sed -i "s/    'dsn' => '${service_db}:host=,.*/    'dsn' => '${service_db}:host=localhost;dbname=${db_name}',/g" "${local_project_dir}/config/web.php"
   docker-compose exec app sed -i "s/    'username' => 'root'.*/    'username' => '${db_username}',/g" "${local_project_dir}/config/web.php"
   docker-compose exec app sed -i "s/    'password' => ''.*/    'password' => '${db_username}',/g" "${local_project_dir}/config/web.php"
+
 fi
 
 
@@ -513,9 +592,12 @@ fi
 
 if [[ $project_framework == "CodeIgniter" ]]; then
 
+  # CodeIgniter
   if [[ $run_db_migrations == "Y" ]]; then
     printf "\nRunning database migrations ..."
     docker exec -w "${local_project_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
+
+#    docker exec -w "${local_project_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
   fi
   if [[ $run_db_seeds == "Y" ]]; then
     printf "\nRunning database seeds ..."
@@ -524,14 +606,14 @@ if [[ $project_framework == "CodeIgniter" ]]; then
 
 elif [[ $project_framework == "Laravel" ]]; then
 
-  docker exec -t "${project_name}-app" bash /var/www/scripts/laravel-clear_cache.sh
+  # Laravel
+  docker exec -w /var/www/scripts "${project_name}-app" bash laravel-clear_cache.sh
+  docker restart "${project_name}-app"
   if [[ $run_db_migrations == "Y" ]]; then
-    printf "\nRunning database migrations ..."
     docker exec -w /var/www/scripts "${project_name}-app" bash laravel-migrate.sh
   fi
   if [[ $run_db_seeds == "Y" ]]; then
-    printf "\nRunning database seeds ..."
-    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-db-seed.sh
+    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-db_seed.sh
   fi
 
 elif [[ $project_framework == "Lumen" ]]; then
@@ -543,6 +625,7 @@ elif [[ $project_framework == "Lumen" ]]; then
 
 fi
 
+printf "\n-----------------------------------------------------------\n\n"
 printf "\nYou can now access the following in you browser:"
 printf "\n\n\tWebsite: http://localhost:${port}\n"
 if [[ "${service_db}" == "mysql" ]] || [[ "${service_db}" == "mariadb" ]]; then

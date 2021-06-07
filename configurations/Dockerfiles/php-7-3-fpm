@@ -26,6 +26,9 @@ RUN apt-get -y update \
     && docker-php-ext-configure intl \
     && docker-php-ext-install intl
 
+# Needed for CodeIgniter
+RUN docker-php-ext-install mysqli
+
 # Install XDebug
 RUN pecl install xdebug \
     && docker-php-ext-enable xdebug \
