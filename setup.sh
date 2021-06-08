@@ -29,16 +29,20 @@ db_port=3306
 db_exposed_port=6603
 db_admin_app="phpMyAdmin"
 db_admin_port=8001
-default_full_install="Y"
-full_install=${default_full_install}
+full_install="Y"
 frameworks_with_db_migrations=("CodeIgniter" "Laravel")
 run_db_migrations="Y"
-default_run_db_migrations=${run_db_migrations}
 frameworks_with_db_seeds=("CodeIgniter" "Laravel")
 run_db_seeds="Y"
-default_run_db_seeds=${run_db_seeds}
+
+create_phpinfo_file="N"
 
 create_docker_containers() {
+
+  # ##########################################################################################
+  # Create the docker containers.
+  # ##########################################################################################
+
   printf "\nCopying configuration files ...\n"
   cd "${project_dir}"
   mkdir "${project_dir}/docker-compose/"
@@ -148,6 +152,11 @@ create_docker_containers() {
   # Remove init.sql setup file.
   ###rm "${init_db_file}"
 }
+
+
+# ##########################################################################################
+# Prompt user for all settings.
+# ##########################################################################################
 
 # Prompt for the type of project. (Are we including MailHog?)
 printf "\nSelect the type of project: [1]"
@@ -275,12 +284,14 @@ printf "\n"
 # Is this a full install?
 frameworks_with_partial_installs=("Symfony")
 if [[ " ${frameworks_with_partial_installs[@]} " =~ " ${project_framework} " ]]; then
-  printf "\nIs this a full install [${default_full_install}]?"
+  printf "\nIs this a full install [Y/n]?"
   valid_replies=("Y N")
   good_reply=false
   while [ "$good_reply" != true ]; do
     read full_install
-    full_install=${full_install:-${default_full_install}}
+    if [ -z "$full_install" ]; then
+      full_install="Y"
+    fi
     full_install=${full_install^^}
     if [[ " ${valid_replies[@]} " =~ " ${full_install} " ]]; then
       good_reply=true
@@ -395,12 +406,14 @@ done
 
 # Should we run database migrations?
 if [[ " ${frameworks_with_db_migrations[@]} " =~ " ${project_framework} " ]]; then
-  printf "\nRun database migrations [${default_run_db_migrations}]?"
+  printf "\nRun database migrations [Y/n]?"
   valid_replies=("Y N")
   good_reply=false
   while [ "$good_reply" != true ]; do
     read run_db_migrations
-    run_db_migrations=${run_db_migrations:-${default_run_db_migrations}}
+    if [ -z "$run_db_migrations" ]; then
+      run_db_migrations="Y"
+    fi
     run_db_migrations=${run_db_migrations^^}
     if [[ " ${valid_replies[@]} " =~ " ${run_db_migrations} " ]]; then
       good_reply=true
@@ -410,18 +423,40 @@ fi
 
 # Should we run database seeders?
 if [[ " ${frameworks_with_db_seeds[@]} " =~ " ${project_framework} " ]]; then
-  printf "\nRun database seeders [${default_run_db_seeds}]?"
+  printf "\nRun database seeders [Y/n]?"
   valid_replies=("Y N")
   good_reply=false
   while [ "$good_reply" != true ]; do
     read run_db_seeds
-    run_db_seeds=${run_db_seeds:-${default_run_db_seeds}}
+    if [ -z "$run_db_seeds" ]; then
+      run_db_seeds="Y"
+    fi
     run_db_seeds=${run_db_seeds^^}
     if [[ " ${valid_replies[@]} " =~ " ${run_db_seeds} " ]]; then
       good_reply=true
     fi
   done
 fi
+
+# Should we create a phpinfo.php file
+valid_replies=("Y N")
+printf "\nShould we create a http://localhost:${port}/phpinfo.php file: [Y/n]"
+good_reply=false
+while [ "$good_reply" != true ]; do
+  read create_phpinfo_file
+  if [ -z "$create_phpinfo_file" ]; then
+    create_phpinfo_file="Y"
+  fi
+  create_phpinfo_file=${create_phpinfo_file^^}
+  if [[ " ${valid_replies[@]} " =~ " ${create_phpinfo_file} " ]]; then
+    good_reply=true
+  fi
+done
+
+
+# ##########################################################################################
+# Confirm settings before continuing.
+# ##########################################################################################
 
 printf "\n-----------------------------------------------------------"
 printf "\nProject name:        ${project_name}"
@@ -439,6 +474,7 @@ if [[ "${service_db}" == "mysql" ]] || [[ "${service_db}" == "mariadb" ]]; then
 elif [[ "${service_db}" == "postgres" ]]; then
   printf "\npgAdmin port:        ${db_admin_port}"
 fi
+printf "n/phpinfo.php file"    "${create_phpinfo_file}"
 printf "\nDatabase:"
 printf "\n    Type:            ${service_db}"
 printf "\n    Name:            ${db_name}"
@@ -470,6 +506,11 @@ cd "${project_base_dir}"
 # Copy configuration files to the project directory.
 mkdir "${project_dir}"
 create_docker_containers
+
+
+# ##########################################################################################
+# Install php framework (or repository).
+# ##########################################################################################
 
 if [ -z "$git_repo" ]; then
 
@@ -530,7 +571,11 @@ else
 
 fi
 
+
+# ##########################################################################################
 # Update configuration files.
+# ##########################################################################################
+
 if [[ $project_framework == "CakePHP" ]]; then
 
   # CakePHP
@@ -587,7 +632,10 @@ elif [[ $project_framework == "Yii" ]]; then
 fi
 
 
+# ##########################################################################################
 # Run post install processes.
+# ##########################################################################################
+
 #docker restart "${project_name}-app"
 
 if [[ $project_framework == "CodeIgniter" ]]; then
@@ -624,6 +672,15 @@ elif [[ $project_framework == "Lumen" ]]; then
   fi
 
 fi
+
+# Should we create a phpinfo.php file?
+if [[ $create_phpinfo_file == "Y" ]]; then
+  docker exec -w /var/www/scripts "${project_name}-app" bash create_phpinfo.sh
+fi
+
+# Add any development environment files to .gitignore
+docker exec -w /var/www/scripts "${project_name}-app" bash add_dev_only_files_to_gitignore.sh
+add_dev_only_files_to_gitignore.sh
 
 printf "\n-----------------------------------------------------------\n\n"
 printf "\nYou can now access the following in you browser:"

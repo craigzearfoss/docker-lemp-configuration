@@ -3,7 +3,9 @@ services:
   mailhog:
     image: mailhog/mailhog:latest
     container_name: fake-smtp-mailhog
-    restart: always
+    logging:
+    driver: 'none'  #disable saving logs
+    restart: unless-stopped
     ports:
-      - 1025:1025
-      - 8025:8025
+      - 1025:1025 # smtp server
+      - 8025:8025 # web ui
