@@ -9,7 +9,7 @@ fi
 
 printf "\nAre you sure that your want to destroy Docker environments for $docker_env?"
 printf "\nThis will destroy all associated Docker containers and cannot be undone."
-read -p "Do you want to continue? [y/N]" reply
+read -p "Do you want to continue? [N]" reply
 if [[ "${reply^^}" != "Y" ]]; then
   exit
 fi
