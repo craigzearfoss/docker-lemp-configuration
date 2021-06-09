@@ -56,11 +56,11 @@ define_docker_files() {
 
   docker_file="${container_dir}/Dockerfile"
   docker_compose_file="${container_dir}/docker-compose.yml"
-  nginx_conf_file="${container_dir}/conf-files/${service_server,,}.conf"
+  server_conf_file="${container_dir}/conf-files/${service_server,,}.conf"
   if [[ "${service_db^^}" == "MARIADB" ]] || [[ "${service_db^^}" == "MYSQL" ]]; then
-    init_db_file="${container_dir}/init-files/db_init.sql"
+    init_db_file="${container_dir}/init-files/${service_db,,}/initdb.sql"
   elif [[ "${service_db^^}" == "POSTGRES" ]]; then
-    init_db_file="${container_dir}/init-files/db_init.sh"
+    init_db_file="${container_dir}/init-files/${service_db,,}/initdb.sh"
   else
     init_db_file=""
   fi
@@ -71,11 +71,10 @@ create_docker_files() {
   # Create the docker containers.
   # ##########################################################################################
 
-  cd "${container_base_dir}"
   mkdir "${container_dir}"
-  cd "${container_dir}"
   mkdir "${container_dir}/conf-files/"
   mkdir "${container_dir}/init-files/"
+  mkdir "${container_dir}/init-files/${service_db,,}/"
 
   # Copy Dockerfile.
   printf "Copying Dockerfile ...\n"
@@ -119,31 +118,31 @@ create_docker_files() {
 
   # Copy nginx configuration file (First look for PHP framework-specific file)
   if [ -f "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}/project.conf" ]; then
-    cp "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}/project.conf" "${nginx_conf_file}"
+    cp "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}/project.conf" "${server_conf_file}"
   else
-    cp "${working_dir}/configurations/server-files/${service_server,,}/project.conf" "${nginx_conf_file}"
+    cp "${working_dir}/configurations/server-files/${service_server,,}/project.conf" "${server_conf_file}"
   fi
 
-  # Make modifications to the nginx configuration file.
+  # Make modifications to the server configuration file.
   printf "Updating Nginx configuration file ...\n"
   if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
-    sed -i "s/server_name .*/server_name localhost;/g" ${nginx_conf_file}
-    sed -i "s/[::]:80 /[::]:${port}/g" ${nginx_conf_file}
-    sed -i "s/root .*/root   \/var\/www\/${project_name}\/public\/webroot;/g" ${nginx_conf_file}
-    sed -i "s/error_log .*/error_log  \/var\/www\/${project_name}\/log\/error.log;/g" ${nginx_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/www\/${project_name}\/log\/access.log;/g" ${nginx_conf_file}
+    sed -i "s/server_name .*/server_name localhost;/g" ${server_conf_file}
+    sed -i "s/[::]:80 /[::]:${port}/g" ${server_conf_file}
+    sed -i "s/root .*/root   \/var\/www\/${project_name}\/public\/webroot;/g" ${server_conf_file}
+    sed -i "s/error_log .*/error_log  \/var\/www\/${project_name}\/log\/error.log;/g" ${server_conf_file}
+    sed -i "s/access_log .*/access_log \/var\/www\/${project_name}\/log\/access.log;/g" ${server_conf_file}
   elif [[ "${php_framework^^}" == "CODEIGNITER" ]]; then
-    sed -i "s/root .*/root \/var\/www\/${project_name}\/public;/g" ${nginx_conf_file}
-    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${nginx_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${nginx_conf_file}
+    sed -i "s/root .*/root \/var\/www\/${project_name}\/public;/g" ${server_conf_file}
+    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
+    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
   elif [[ "${php_framework^^}" == "YII" ]]; then
-    sed -i "s/root .*/root \/var\/www\/${project_name}\/web;/g" ${nginx_conf_file}
-    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${nginx_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${nginx_conf_file}
+    sed -i "s/root .*/root \/var\/www\/${project_name}\/web;/g" ${server_conf_file}
+    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
+    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
   else
-    sed -i "s/root .*/root \/var\/www\/${project_name}\/public;/g" ${nginx_conf_file}
-    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${nginx_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${nginx_conf_file}
+    sed -i "s/root .*/root \/var\/www\/${project_name}\/public;/g" ${server_conf_file}
+    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
+    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
   fi
 
   printf "Adding database credentials ...\n"
@@ -175,17 +174,18 @@ create_docker_files() {
   fi
 
   # Copy bash scripts (and set variable values).
-  printf "\nCopying bash script files ...\n"
-  mkdir "${container_dir}/scripts/"
-  cp -r "${working_dir}/scripts/" "${container_dir}"
-  for bash_script in "${container_dir}"/scripts/*.sh; do
-    sed -i "s/{{project_name}}/${project_name}/g" "${bash_script}"
-    sed -i "s#{{local_container_dir}}#${local_container_dir}#g" "${bash_script}"
-  done
+#  printf "\nCopying bash script files ...\n"
+#  mkdir "${container_dir}/scripts/"
+#  cp -r "${working_dir}/scripts/" "${container_dir}"
+#  for bash_script in "${container_dir}"/scripts/*.sh; do
+#    sed -i "s/{{project_name}}/${project_name}/g" "${bash_script}"
+#    sed -i "s#{{local_container_dir}}#${local_container_dir}#g" "${bash_script}"
+#  done
 }
 
 build_docker_images() {
   printf "Building Docker images ...\n"
+  cd "${container_dir}"
   docker-compose build
   docker-compose up -d
   docker-compose ps
@@ -350,6 +350,44 @@ get_yes_or_no_response() {
   done
 }
 
+set_php_framework_or_git_repo() {
+  printf "\nSelect the PHP framework or enter a git repository."
+  options=("(none)")
+  for framework in "${php_frameworks[@]}"; do
+    options+=("${framework}")
+  done
+
+  i=1
+  for name in "${options[@]}"; do
+    printf "\n\t${i} - ${name##*/}"
+    i=$((${i} + 1))
+  done
+  printf "\n"
+  valid_response=false
+  while [[ "${valid_response}" == false ]]; do
+    read response
+    if [[ "$response" -gt 0 && "$response" -le "${#options[@]}" ]]; then
+      valid_response=true
+      if [[ "$response" -gt 1 ]]; then
+        valid_response=true
+        selected_index=$((${response} - 2))
+        php_framework="${php_frameworks[$selected_index]}"
+      else
+        php_framework=""
+      fi
+      get_repo=""
+    elif [[ ! -z "${response}" ]]; then
+      if (git ls-remote "${response}" -q 2>&1); then
+        valid_response=true
+        php_framework=""
+        git_repo="${response}"
+      else
+        printf "\nGit repository does not exist or it is not accessible.\n"
+      fi
+    fi
+  done
+}
+
 display_configuration() {
   printf "\n-----------------------------------------------------------"
   printf "\nProject name:        ${project_name}"
@@ -465,30 +503,11 @@ while [[ "${port_is_in_use}" == true ]]; do
   fi
 done
 
-# Get the PHP framework
-printf "\nSelect the PHP framework."
-get_choice_response "${php_frameworks[@]}"
-php_framework="${php_frameworks[$response]}"
-
-# Get the git repository (If there is one)
-repo_okay=false
-printf "\nEnter the Git repository. (Leave blank for none.)\n"
-while [ "${repo_okay}" != true ]; do
-  read git_repo
-  if [ -z "${git_repo}" ]; then
-    repo_okay=true
-  else
-    if (git ls-remote "${git_repo}" -q 2>&1); then
-      repo_okay=true
-    else
-      printf "\nEnter a different git repository or leave blank to create a new project.\n"
-      git_repo=
-    fi
-  fi
-done
+# Set PHP framework (or git repository)
+set_php_framework_or_git_repo
 
 # Is this a full install?
-if [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]] && [[ ! -z "${git_repo}" ]]; then
+if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]]; then
   printf "\nIs this a full install? [Y]"
   get_yes_or_no_response "Y"
   if [[ "${response}" == "Y" ]]; then
@@ -525,7 +544,7 @@ elif [[ "${service_db^^}" == "POSTGRES" ]]; then
 else
   service_db_admin=""
 fi
-if [ ! -z "${service_db_admin}" ]; then
+if [[ ! -z "${service_db_admin}" ]]; then
   printf "\nCreate a container for ${service_db_admin}? [Y]\n"
   get_yes_or_no_response "Y"
   if [[ "${response}" == "N" ]]; then
@@ -637,7 +656,7 @@ create_docker_files
 
 # Build the docker images
 build_docker_images
-
+exit
 # Build the PHP project
 build_php_project
 

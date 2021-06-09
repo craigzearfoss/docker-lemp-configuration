@@ -13,7 +13,7 @@
     ports:
       - "{{db_exposed_port}}:5432"
     volumes:
-      - ./docker-compose/postgres:/docker-entrypoint-initdb.d/init.sql
+      - ./init-files/postgres:/docker-entrypoint-initdb.d/init.sql
     networks:
       - {{project_name}}
 

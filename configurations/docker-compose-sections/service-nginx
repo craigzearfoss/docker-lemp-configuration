@@ -6,7 +6,7 @@
       - {{port}}:80
     volumes:
       - ./:/var/www
-      - ./docker-compose/nginx:/etc/nginx/conf.d/
+      - ./conf-files/:/etc/nginx/conf.d/
     networks:
       - {{project_name}}
 
