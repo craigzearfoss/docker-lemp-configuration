@@ -26,8 +26,7 @@ project_name=$1
 php_framework=""
 git_repo=""
 working_dir="$(pwd)"
-base_dir=$(echo $working_dir | sed "s|\(.*\)/.*|\1|")
-container_base_dir="$base_dir"
+container_base_dir=$(echo $working_dir | sed "s|\(.*\)/.*|\1|")
 container_dir="${container_base_dir}/${project_name}"
 doc_root="${container_dir}/${project_name}"
 local_container_dir="/var/www/${project_name}"
@@ -40,12 +39,17 @@ db_username=
 db_password=
 db_port=3306
 db_exposed_port=6603
-db_admin_port=8001
+dd_admin_port=$((${dd_admin_port} + 1))
+
 full_install=true
 frameworks_with_db_migrations=("CodeIgniter" "Laravel")
 run_db_migrations=false
 frameworks_with_db_seeds=("CodeIgniter" "Laravel")
 run_db_seeds="Y"
+
+# Set the project URLs
+site_url="http://localhost:${port}"
+db_admin_url="http://localhost:${db_admin_port}"
 
 create_phpinfo_file="N"
 
@@ -117,6 +121,7 @@ create_docker_files() {
   sed -i "s/{{db_admin_port}}/${db_admin_port}/g" ${docker_compose_file}
 
   # Copy nginx configuration file (First look for PHP framework-specific file)
+  printf "Creating server configuration file ${else} ...\n"
   if [ -f "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}/project.conf" ]; then
     cp "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}/project.conf" "${server_conf_file}"
   else
@@ -124,7 +129,6 @@ create_docker_files() {
   fi
 
   # Make modifications to the server configuration file.
-  printf "Updating Nginx configuration file ...\n"
   if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
     sed -i "s/server_name .*/server_name localhost;/g" ${server_conf_file}
     sed -i "s/[::]:80 /[::]:${port}/g" ${server_conf_file}
@@ -152,6 +156,7 @@ create_docker_files() {
   export DB_PASSWORD="${db_password}"
 
   # Copy initial db commands file
+  printf "Creating database entry point file ${init_db_file} ...\n"
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
     cp "${working_dir}/configurations/db-files/${service_db,,}/init.sql" "${init_db_file}"
   elif [[ "${service_db^^}" == "POSTGRES" ]]; then
@@ -161,6 +166,8 @@ create_docker_files() {
   # Add superuser create to init.sql file
   ## @TODO: Need to implement for Postgres
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
+    echo "" >> ${init_db_file}
+    echo "Create administrator account" >> ${init_db_file}
     echo "CREATE DATABASE FLUSH ${db_name};" >> ${init_db_file}
     echo "CREATE USER \"${db_username}'@'localhost' IDENTIFIED BY \"${db_password}\";" >> ${init_db_file}
     echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'localhost' WITH GRANT OPTION;" >> ${init_db_file}
@@ -174,13 +181,13 @@ create_docker_files() {
   fi
 
   # Copy bash scripts (and set variable values).
-#  printf "\nCopying bash script files ...\n"
-#  mkdir "${container_dir}/scripts/"
-#  cp -r "${working_dir}/scripts/" "${container_dir}"
-#  for bash_script in "${container_dir}"/scripts/*.sh; do
-#    sed -i "s/{{project_name}}/${project_name}/g" "${bash_script}"
-#    sed -i "s#{{local_container_dir}}#${local_container_dir}#g" "${bash_script}"
-#  done
+  printf "\nCopying bash script files ...\n"
+  mkdir "${container_dir}/scripts/"
+  cp -r "${working_dir}/scripts/" "${container_dir}"
+  for bash_script in "${container_dir}"/scripts/*.sh; do
+    sed -i "s/{{project_name}}/${project_name}/g" "${bash_script}"
+    sed -i "s#{{local_container_dir}}#${local_container_dir}#g" "${bash_script}"
+  done
 }
 
 build_docker_images() {
@@ -194,126 +201,223 @@ build_docker_images() {
   ###rm "${init_db_file}"
 }
 
-build_php_project() {
-  # ##########################################################################################
-  # Build the PHP framework (or repository).
-  # ##########################################################################################
+create_cakephp_project() {
+  printf "\nCreating CakePHP project ...\n"
+  composer create-project --prefer-dist cakephp/app:~4.0 --working-dir="${container_dir}" "${project_name}"
+  cp "${container_dir}/config/.env.example" "${container_dir}/config/.env"
 
-  if [ -z "$git_repo" ]; then
+  printf "\nUpdating .env file and configuration settings ...\n"
+  docker-compose exec app sed -i "s/export APP_NAME=.*/export APP_NAME=\"${project_name}\"/g" "${local_container_dir}/config/.env"
+  docker-compose exec app sed -i "s/export SECURITY_SALT=.*/export SECURITY_SALT=\"$(openssl rand -base64 6)\"/g" "${local_container_dir}/config/.env"
+}
 
-    if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
-      # CakePHP
-      printf "\nCreating CakePHP project ...\n"
-      composer create-project --prefer-dist cakephp/app:~4.0 --working-dir="${container_dir}" "${project_name}"
-      cp "${container_dir}/config/.env.example" "${container_dir}/config/.env"
-
-    elif [[ "${php_framework^^}" == "CODEIGNITER" ]]; then
-      # CodeIgniter
-      printf "\nCreating CodeIgniter project ...\n"
-      docker exec -w "${local_container_dir}" "${project_name}-app" composer create-project codeigniter4/appstarter "${project_name}"
+create_codeigniter_project() {
+  printf "\nCreating CodeIgniter project ...\n"
+  docker exec -w "${local_container_dir}" "${project_name}-app" composer create-project codeigniter4/appstarter "${project_name}"
 
 #      cp "${container_dir}/env" "${container_dir}/.env"
 #      docker exec -w "${working_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-initialize_env_file.sh"
 #      cat "${working_dir}/configurations/env-sections/CodeIgniter" >>  "${container_dir}/${project_name}/.env"
-exit;
-    elif [[ "${php_framework^^}" == "LARAVEL" ]]; then
-      # Laravel
-      printf "\nCreating Laravel project ...\n"
-      composer create-project laravel/laravel --working-dir=${doc_root} "${project_name}"
+  printf "\nUpdating .env file and configuration settings ...\n"
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.hostname =.*/database.default.hostname = db-${service_db}/g" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.database =.*/database.default.database = ${db_name}/g" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.username =.*/database.default.username = ${db_username}/g" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.password =.*/database.default.password = '${db_password}'/g" .env
+  hash=$(dd if=/dev/urandom bs=1 count=32 2>/dev/null | base64 -w 0 | rev | cut -b 2- | rev 2>&1)
+  hash=$(echo -n $hash | md5sum | cut -c 1-32)
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/HASH_SECRET_KEY =.*/HASH_SECRET_KEY = \'${hash}\'/" .env
+  if [ -z "$git_repo" ]; then
+    docker exec -w "${local_container_dir}/app/Config" "${project_name}-app" sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" App.php
+    docker exec -w "${local_container_dir}/app/Config" "${project_name}-app" sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g" App.php
+  fi
+}
 
-    elif [[ "${php_framework^^}" == "LUMEN" ]]; then
-      # Lumen
-      printf "\nCreating Lumen project ...\n"
-      composer create-project --prefer-dist laravel/lumen --working-dir=${doc_root} "${project_name}"
+create_laravel_project() {
+  printf "\nCreating Laravel project ...\n"
+  composer create-project laravel/laravel --working-dir=${doc_root} "${project_name}"
 
-    elif [[ "${php_framework^^}" == "SYMFONY" ]]; then
-      # Symfony
-      printf "\nCreating Symfony project ...\n"
-      if [[ "${full_install}" == true ]]; then
-        composer create-project symfony/website-skeleton --working-dir=${doc_root} "${project_name}"
-      else
-        composer create-project symfony/skeleton --working-dir=${doc_root} "${project_name}"
+  printf "\nUpdating .env file and configuration settings ...\n"
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_ENV=.*/APP_ENV=local/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" php artisan key:generate
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_URL=.*/APP_URL=http:\/\/localhost:${port}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PORT=.*/DB_PORT=${db_port}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" .env
+}
+
+create_lumen_project() {
+  printf "\nCreating Lumen project ...\n"
+  composer create-project --prefer-dist laravel/lumen --working-dir=${doc_root} "${project_name}"
+
+  printf "\nUpdating .env file and configuration settings ...\n"
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_ENV=.*/APP_ENV=local/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" php artisan key:generate
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_URL=.*/APP_URL=http:\/\/localhost:${port}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PORT=.*/DB_PORT=${db_port}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" .env
+  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" .env
+}
+
+create_symfony_project() {
+  printf "\nCreating Symfony project ...\n"
+  if [[ "${full_install}" == true ]]; then
+    composer create-project symfony/website-skeleton --working-dir=${doc_root} "${project_name}"
+  else
+    composer create-project symfony/skeleton --working-dir=${doc_root} "${project_name}"
+  fi
+
+  printf "\nUpdating .env file and configuration settings ...\n"
+  docker-compose exec app echo "DB_USER=${db_username}" >> "${local_container_dir}/.local.env"
+  docker-compose exec app echo "DB_PASS=${db_password}" >> "${local_container_dir}/.local.env"
+}
+
+create_yii_project() {
+  composer create-project --prefer-dist yiisoft/yii2-app-basic --working-dir=${doc_root} "$project_name"
+
+  printf "\nUpdating configuration settings ...\n"
+  docker-compose exec app sed -i "s/    'dsn' => '${service_db}:host=,.*/    'dsn' => '${service_db}:host=localhost;dbname=${db_name}',/g" "${local_container_dir}/config/web.php"
+  docker-compose exec app sed -i "s/    'username' => 'root'.*/    'username' => '${db_username}',/g" "${local_container_dir}/config/web.php"
+  docker-compose exec app sed -i "s/    'password' => ''.*/    'password' => '${db_username}',/g" "${local_container_dir}/config/web.php"
+}
+
+create_root_index_file() {
+  root_index_file="${container_dir}/${project_name}/public/index.php"
+  printf "\nCreating ${root_index_file} ...\n"
+  mkdir -p "${container_dir}/${project_name}/public"
+  echo "<?php" > "${root_index_file}"
+  echo "echo <<<EOL" >> "${root_index_file}"
+  echo "<!DOCTYPE html>" >> "${root_index_file}"
+  echo "<html>" >> "${root_index_file}"
+  echo "<head>" >> "${root_index_file}"
+  echo "<meta charset=\"UTF-8\">" >> "${root_index_file}"
+  echo "<title>${project_name}</title>" >> "${root_index_file}"
+  echo "</head>" >> "${root_index_file}"
+  echo "<body>" >> "${root_index_file}"
+  echo "<h2>${project_name}</h2>" >> "${root_index_file}"
+  echo "<hr/>" >> "${root_index_file}"
+  echo "<p>Create your project in the <b>${project_name}-app</b> container in the directory <b style=\"font-family:Courier New;\">/www/var/${project_name}</b>.</p>" >> "${root_index_file}"
+  echo "<ul>" >> "${root_index_file}"
+  echo "<dl><dt>To access the server docker container:</dt><dd><b style=\"font-family:Courier New;\">docker -ti exec ${project_name}-app bash</b></dd></dl>" >> "${root_index_file}"
+  echo "</ul>" >> "${root_index_file}"
+  echo "<table>" >> "${root_index_file}"
+  echo "<tbody>" >> "${root_index_file}"
+  echo "<tr><td>Website URL:</td><td><a href=\"${site_url}\">${site_url}</a></td></tr>" >> "${root_index_file}"
+  echo "<tr><td>${service_db_admin} URL:</td><td><a href=\"${db_admin_url}\" target=\"_blank\">${db_admin_url}</a></td></tr>" >> "${root_index_file}"
+  if [[ "${create_phpinfo_file}" == true ]]; then
+    echo "<tr><td>PHP Information:</td><td><a href=\"${site_url}/phpinfo.php\" target=\"_blank\">${site_url}/phpinfo.php</a></td></tr>" >> "${root_index_file}"
+  fi
+  echo "<tr><td>Docker version:</td><td>${docker_version}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Container directory:</td><td>${container_dir}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Git repository:</td><td>${git_repo}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Database type:</td><td>${service_db}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Database host/server:</td><td>db-${service_db,,}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Database name:</td><td>db-${db_name}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Database username:</td><td>${db_username}</td></tr>" >> "${root_index_file}"
+  echo "<tr><td>Database password:</td><td>***${db_password: -3}</td></tr>" >> "${root_index_file}"
+  echo "</tbody>" >> "${root_index_file}"
+  echo "</table>" >> "${root_index_file}"
+  echo "</body>" >> "${root_index_file}"
+  echo "</html>" >> "${root_index_file}"
+  echo "EOL;" >> "${root_index_file}"
+}
+
+clone_git_repo() {
+  # Clone a git repository
+  echo "\git -C ${doc_root} clone ${git_repo}  ${project_name}"
+  git -C "${doc_root}" clone "${git_repo}" "${project_name}"
+  composer update
+}
+
+create_php_project() {
+  # ##########################################################################################
+  # Build the a new PHP project or get a project from a git repository
+  # ##########################################################################################
+
+  if [[ -z "$git_repo" ]] && [[ -z "$php_framework" ]]; then
+    create_root_index_file
+  else
+    if [[ ! -z "$git_repo" ]]; then
+      clone_git_repo
+    elif [ ! -z "$php_framework" ]; then
+      if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
+        create_cakephp_project
+      elif [[ "${php_framework^^}" == "CODEIGNITER" ]]; then
+        create_codeigniter_project
+      elif [[ "${php_framework^^}" == "LARAVEL" ]]; then
+        create_laravel_project
+      elif [[ "${php_framework^^}" == "LUMEN" ]]; then
+        create_lumen_project
+      elif [[ "${php_framework^^}" == "SYMFONY" ]]; then
+        create_symfony_project
+      elif [[ "${php_framework^^}" == "YII" ]]; then
+        create_yii_project
       fi
+    fi
+  fi
+}
 
-    elif [[ "${php_framework^^}" == "YII" ]]; then
-      # Yii
-      composer create-project --prefer-dist yiisoft/yii2-app-basic --working-dir=${doc_root} "$project_name"
+run_post_install_processes_OLD(){
+  #docker restart "${project_name}-app"
 
-    else
-      printf "\nInvalid framework '${php_framework}' specified."
+  if [[ $project_framework == "CodeIgniter" ]]; then
 
+    # CodeIgniter
+    if [[ $run_db_migrations == "Y" ]]; then
+      printf "\nRunning database migrations ..."
+      docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
+
+  #    docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
+    fi
+    if [[ $run_db_seeds == "Y" ]]; then
+      printf "\nRunning database seeds ..."
+      docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-db-seed.sh"
     fi
 
-  else
+  elif [[ $project_framework == "Laravel" ]]; then
 
-    # Clone a git repository
-    echo "\git -C ${doc_root} clone ${git_repo}  ${project_name}"
-    git -C "${doc_root}" clone "${git_repo}" "${project_name}"
-    composer update
+    # Laravel
+    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-clear_cache.sh
+    docker restart "${project_name}-app"
+    if [[ $run_db_migrations == "Y" ]]; then
+      docker exec -w /var/www/scripts "${project_name}-app" bash laravel-migrate.sh
+    fi
+    if [[ $run_db_seeds == "Y" ]]; then
+      docker exec -w /var/www/scripts "${project_name}-app" bash laravel-db_seed.sh
+    fi
+
+  elif [[ $project_framework == "Lumen" ]]; then
+
+    docker-compose exec app php "${local_container_dir}/artisan" cache:clear
+    if [[ $run_db_migrations == "Y" ]]; then
+      docker-compose exec app php "${local_container_dir}/artisan" migrate
+    fi
 
   fi
 
-  build_docker_images
 
-  exit
+  # Add any development environment files to .gitignore
+  docker exec -w /var/www/scripts "${project_name}-app" bash add_dev_only_files_to_gitignore.sh
+  add_dev_only_files_to_gitignore.sh
+}
 
+run_post_install_processes(){
   # ##########################################################################################
-  # Update configuration files.
+  # Run post install processes.
   # ##########################################################################################
 
-  if [[ $project_framework == "CakePHP" ]]; then
-
-    # CakePHP
-    printf "\nUpdating .env file and configuration settings ...\n"
-    docker-compose exec app sed -i "s/export APP_NAME=.*/export APP_NAME=\"${project_name}\"/g" "${local_container_dir}/config/.env"
-    docker-compose exec app sed -i "s/export SECURITY_SALT=.*/export SECURITY_SALT=\"$(openssl rand -base64 6)\"/g" "${local_container_dir}/config/.env"
-
-  elif [[ $project_framework == "CodeIgniter" ]]; then
-
-    # CodeIgniter
-    printf "\nUpdating .env file and configuration settings ...\n"
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.hostname =.*/database.default.hostname = db-${service_db}/g" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.database =.*/database.default.database = ${db_name}/g" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.username =.*/database.default.username = ${db_username}/g" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/# database.default.password =.*/database.default.password = '${db_password}'/g" .env
-    hash=$(dd if=/dev/urandom bs=1 count=32 2>/dev/null | base64 -w 0 | rev | cut -b 2- | rev 2>&1)
-    hash=$(echo -n $hash | md5sum | cut -c 1-32)
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/HASH_SECRET_KEY =.*/HASH_SECRET_KEY = \'${hash}\'/" .env
-    if [ -z "$git_repo" ]; then
-      docker exec -w "${local_container_dir}/app/Config" "${project_name}-app" sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" App.php
-      docker exec -w "${local_container_dir}/app/Config" "${project_name}-app" sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g" App.php
-    fi
-
-  elif [[ $project_framework == "Laravel" ]] || [[ $project_framework == "Lumen" ]]; then
-
-    # Laravel/Lumen
-    printf "\nUpdating .env file and configuration settings ...\n"
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_ENV=.*/APP_ENV=local/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" php artisan key:generate
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_URL=.*/APP_URL=http:\/\/localhost:${port}/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PORT=.*/DB_PORT=${db_port}/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" .env
-    docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" .env
-
-  elif [[ $project_framework == "Symfony" ]]; then
-
-    # Symfony
-    printf "\nUpdating .env file and configuration settings ...\n"
-    docker-compose exec app echo "DB_USER=${db_username}" >> "${local_container_dir}/.local.env"
-    docker-compose exec app echo "DB_PASS=${db_password}" >> "${local_container_dir}/.local.env"
-
-  elif [[ $project_framework == "Yii" ]]; then
-
-    # Yii
-    printf "\nUpdating configuration settings ...\n"
-    docker-compose exec app sed -i "s/    'dsn' => '${service_db}:host=,.*/    'dsn' => '${service_db}:host=localhost;dbname=${db_name}',/g" "${local_container_dir}/config/web.php"
-    docker-compose exec app sed -i "s/    'username' => 'root'.*/    'username' => '${db_username}',/g" "${local_container_dir}/config/web.php"
-    docker-compose exec app sed -i "s/    'password' => ''.*/    'password' => '${db_username}',/g" "${local_container_dir}/config/web.php"
-
+  # Should we create a phpinfo.php file?
+  if [[ "${create_phpinfo_file}" == true ]]; then
+    phpinfo_file="${container_dir}/${project_name}/public/phpinfo.php"
+    printf "\nCreating ${phpinfo_file} ...\n"
+    echo '<?php' > "${phpinfo_file}"
+    echo 'phpinfo();' >> "${phpinfo_file}"
   fi
 }
 
@@ -384,6 +488,9 @@ set_php_framework_or_git_repo() {
       else
         printf "\nGit repository does not exist or it is not accessible.\n"
       fi
+    else
+      php_framework=""
+      git_repo=""
     fi
   done
 }
@@ -391,19 +498,21 @@ set_php_framework_or_git_repo() {
 display_configuration() {
   printf "\n-----------------------------------------------------------"
   printf "\nProject name:        ${project_name}"
-  printf "\nWebsite URL:         http://localhost:${port}"
+  printf "\nWebsite URL:         ${site_url}"
   if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
-    printf "\nphpMyAdmin URL:      http://localhost:${db_admin_port}"
+    printf "\nphpMyAdmin URL:      ${db_admin_url}"
   elif [[ "${service_db_admin^^}" == "PGMYADMIN" ]]; then
-    printf "\npgAdmin URL :        http://localhost:${db_admin_port}"
+    printf "\npgAdmin URL :        ${db_admin_url}"
   fi
+  if [[ "${create_phpinfo_file}" == true ]]; then
+    printf "\nPHP Information:     ${site_url}/phpinfo.php"
+  fi
+  printf "\nDocker version:      ${docker_version}"
   printf "\nPHP framework:       ${php_framework}"
   if [[ "${php_framework}" == "Symfony" ]] && [[ "${full_install}" == false ]]; then
     printf " (Partial install)"
   fi
-  printf "\nBase directory:      ${base_dir}"
   printf "\nWorking directory:   ${working_dir}"
-  printf "\nBase directory:      ${base_dir}"
   printf "\nContainer base dir:  ${container_base_dir}"
   printf "\nContainer directory: ${container_dir}"
   printf "\nGit repository:      ${git_repo}"
@@ -502,6 +611,7 @@ while [[ "${port_is_in_use}" == true ]]; do
     port_is_in_use=false
   fi
 done
+site_url="http://localhost:${port}"
 
 # Set PHP framework (or git repository)
 set_php_framework_or_git_repo
@@ -557,6 +667,7 @@ if [[ ! -z "${service_db_admin}" ]]; then
     db_admin_port=$((db_admin_port + 1))
   done
 fi
+db_admin_url="http://localhost:${db_admin_port}"
 
 # Get database root password
 printf "\nEnter database root password.\n"
@@ -654,70 +765,35 @@ define_docker_files
 # Create the docker files
 create_docker_files
 
+# Create the PHP project
+create_php_project
+
 # Build the docker images
 build_docker_images
-exit
-# Build the PHP project
-build_php_project
 
+# Run post-install process
+run_post_install_processes
 
-# ##########################################################################################
-# Run post install processes.
-# ##########################################################################################
-
-#docker restart "${project_name}-app"
-
-if [[ $project_framework == "CodeIgniter" ]]; then
-
-  # CodeIgniter
-  if [[ $run_db_migrations == "Y" ]]; then
-    printf "\nRunning database migrations ..."
-    docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
-
-#    docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
-  fi
-  if [[ $run_db_seeds == "Y" ]]; then
-    printf "\nRunning database seeds ..."
-    docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-db-seed.sh"
-  fi
-
-elif [[ $project_framework == "Laravel" ]]; then
-
-  # Laravel
-  docker exec -w /var/www/scripts "${project_name}-app" bash laravel-clear_cache.sh
-  docker restart "${project_name}-app"
-  if [[ $run_db_migrations == "Y" ]]; then
-    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-migrate.sh
-  fi
-  if [[ $run_db_seeds == "Y" ]]; then
-    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-db_seed.sh
-  fi
-
-elif [[ $project_framework == "Lumen" ]]; then
-
-  docker-compose exec app php "${local_container_dir}/artisan" cache:clear
-  if [[ $run_db_migrations == "Y" ]]; then
-    docker-compose exec app php "${local_container_dir}/artisan" migrate
-  fi
-
-fi
-
-# Should we create a phpinfo.php file?
-if [[ $create_phpinfo_file == "Y" ]]; then
-  docker exec -w /var/www/scripts "${project_name}-app" bash create_phpinfo.sh
-fi
-
-# Add any development environment files to .gitignore
-docker exec -w /var/www/scripts "${project_name}-app" bash add_dev_only_files_to_gitignore.sh
-add_dev_only_files_to_gitignore.sh
-
+# Display the project configuration
 display_configuration
 
 printf "\nYou can now access the following in your browser:"
-printf "\n\n\tWebsite: http://localhost:${port}\n"
-if [[ ! -z "${service_db_admin}" ]]; then
-  printf "\n\thttp://localhost:${db_admin_port}"
+printf "\n\n\tWebsite:         ${site_url}\n"
+if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
+  printf "\tphpMyAdmin:      ${db_admin_url}"
+  printf "\n\t    Server:   db-${service_db}"
+  printf "\n\t    Username: ${db_username}"
+  printf "\n\t    Password: ***${db_password: -3}"
+elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
+  printf "\tpgAdmin:           http://localhost:${db_admin_port}"
+fi
+if [[ "${create_phpinfo_file}" == true ]]; then
+  printf "\n\tPHP Information: ${site_url}/phpinfo.php"
 fi
 printf "\n"
+
+if [[ -z "${php_framework}" ]] && [[ -z "${git_rep}" ]]; then
+  printf "\nCreate your project in the ${project_name}-app container in the directory /www/var/${project_name}.\n\n"
+fi
 
 exit
