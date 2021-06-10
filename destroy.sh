@@ -8,14 +8,14 @@ if [ -z "$docker_env" ]; then
 fi
 
 printf "\nAre you sure that your want to destroy Docker environments for $docker_env?"
-printf "\nThis will destroy all associated Docker containers and cannot be undone."
+printf "\nThis will destroy all associated Docker containers and cannot be undone.\n"
 read -p "Do you want to continue? [N]" reply
 if [[ "${reply^^}" != "Y" ]]; then
   exit
 fi
 
 
-if [[ "$docker_env}" == "fake-smtp-mailhog" ]]; then
+if [[ "$docker_env}" == "mailhog" ]]; then
 
   container_name="$docker_env"
   printf "\nKilling container ${container_name} ...\n\t"
@@ -27,7 +27,7 @@ if [[ "$docker_env}" == "fake-smtp-mailhog" ]]; then
   printf "\nRemoving image ${container_name} ...\n\t"
   docker image rm "${container_name}"
 
-  printf "\nThe MailHog container fake-smtp-mail has been destroyed.\n\t"
+  printf "\nThe MailHog container mailhog has been destroyed.\n\t"
 
 else
 
@@ -47,7 +47,7 @@ else
 
   printf "\nAll containers for ${docker_env} have been destroyed.\n\t"
   printf "\nIf you want to destroy the mailhog container run the following command:"
-  printf "\n\tbash destroy.sh fake-smtp-mailhog"
+  printf "\n\tbash destroy.sh mailhog"
 fi
 
 printf "\n\n"

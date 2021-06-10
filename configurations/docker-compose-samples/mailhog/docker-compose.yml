@@ -2,7 +2,7 @@ version: "3.7"
 services:
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: fake-smtp-mailhog
+    container_name: mailhog
     logging:
     driver: 'none'  #disable saving logs
     restart: unless-stopped

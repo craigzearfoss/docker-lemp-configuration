@@ -1,6 +1,6 @@
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: fake-smtp-mailhog
+    container_name: mailhog
     restart: always
     ports:
       - 1025:1025
