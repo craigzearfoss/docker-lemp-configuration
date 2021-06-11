@@ -1,0 +1,3 @@
+#!/bin/bash
+
+printf "\nCreating WordPress project ...\n"
