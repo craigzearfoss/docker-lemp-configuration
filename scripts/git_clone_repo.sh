@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Create CodeIgniter project
-echo  "Creating CodeIgniter project ..."
+# Clone a git repository
+echo  "Cloning CodeIgniter project ..."
 if [ -d "/var/www/site" ]; then
   echo "Directory /var/www/site already exists."
   echo "Delete it and rerun this script."
@@ -12,15 +12,9 @@ if [ ! -d "/var/www" ]; then
   mkdir -p "/var/www"
 fi
 
-# Create project
-if [ -d "/var/www/site" ]; then
-  rm -Rf /var/www/site
-fi
-
+# Clone repository
 cd /var/www
-
-composer create-project codeigniter4/appstarter site
-chmod -R 0777 /var/www/site
+git clone {{git_repo}} site
 
 # Install vendor files
 cd /var/www/site

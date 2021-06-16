@@ -1,7 +1,8 @@
 #!/bin/bash
 
 printf "\nCreating Laravel project ...\n"
-docker exec -w /var/www "${project_name}-app" composer create-project laravel/laravel site
+cd /var/www
+composer create-project laravel/laravel site
 
 #  printf "\nUpdating .env file and configuration settings ...\n"
 #  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" .env

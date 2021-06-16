@@ -21,7 +21,9 @@ container_base_dir=$(echo $working_dir | sed "s|\(.*\)/.*|\1|")
 container_dir="${container_base_dir}/${project_name}"
 site_dir="${container_dir}/site"
 web_root="${container_dir}/site/public"
+local_web_root="/var/www/site/public"
 local_container_dir="/var/www/${project_name}"
+create_project_script="${container_dir}/create_project.sh"
 port=
 default_port=8000
 dockerfiles=("${working_dir}"/configurations/Dockerfiles/*)
@@ -58,6 +60,8 @@ site_url="http://localhost:${port}"
 db_admin_url="http://localhost:${db_admin_port}"
 
 create_phpinfo_file="N"
+create_project_script="create_project_script"
+
 
 join_by() {
   local IFS="$1";
@@ -87,17 +91,10 @@ create_docker_files() {
   # Create the docker containers.
   # ##########################################################################################
 
-  mkdir "${container_dir}"
-  mkdir "${container_dir}/conf-files/"
-  mkdir "${container_dir}/init-files/"
-  mkdir "${container_dir}/init-files/${service_db,,}/"
-
-  # Copy configuration files
-  cp -r "${working_dir}/configurations/" "${container_dir}/configurations"
-
-  # Copy Dockerfile.
-  printf "Copying Dockerfile ...\n"
+  printf "\n\nCopying configuration files ...\n"
+  mkdir -p "${container_dir}"
   cp "${working_dir}/configurations/Dockerfiles/${server_version}" "${docker_file}"
+  cp -pr "${working_dir}/configurations/" "${container_dir}/configurations"
 
   # Create docker-compose.yml file.
   printf "Creating docker-compose.yml ...\n"
@@ -134,13 +131,18 @@ create_docker_files() {
   sed -i "s/{{service_db}}/${service_db,,}/g" ${docker_compose_file}
   sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" ${docker_compose_file}
   sed -i "s/{{db_admin_port}}/${db_admin_port}/g" ${docker_compose_file}
+}
 
-  # Copy nginx configuration file (First look for PHP framework-specific file)
-  printf "Creating server configuration file ${server_conf_file} ...\n"
-  if [ -f "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}.conf" ]; then
-    cp "${working_dir}/configurations/server-files/${service_server,,}/${php_framework,,}.conf" "${server_conf_file}"
+create_server_conf_file() {
+  #server configuration
+
+  # copy server configuration file
+  export DIR=${server_conf_file%/*}
+  mkdir -p "${DIR}"
+  if [ -f "${container_dir}/configurations/server-files/${service_server,,}/${php_framework,,}.conf" ]; then
+    cp -p "${container_dir}/configurations/server-files/${service_server,,}/${php_framework,,}.conf" "${server_conf_file}"
   else
-    cp "${working_dir}/configurations/server-files/${service_server,,}/default.conf" "${server_conf_file}"
+    cp -p "${container_dir}/configurations/server-files/${service_server,,}/default.conf" "${server_conf_file}"
   fi
 
   # Make modifications to the server configuration file.
@@ -159,20 +161,21 @@ create_docker_files() {
     sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
     sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
   fi
+}
+
+create_db_init_file() {
+  # entrypoint file(s)
+
+  # copy db entrypoint file
+  export DIR=${init_db_file%/*}
+  mkdir -p "${DIR}"
+  cp "${container_dir}/configurations/db-files/${service_db,,}/${init_db_file##*/}" "${init_db_file}"
 
   printf "Adding database credentials ...\n"
   export DB_DATABASE="${db_name}"
   export DB_ROOT_PASSWORD="${db_root_password}"
   export DB_USERNAME="${db_username}"
   export DB_PASSWORD="${db_password}"
-
-  # Copy initial db commands file
-  printf "Creating database entry point file ${init_db_file} ...\n"
-  if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
-    cp "${working_dir}/configurations/db-files/${service_db,,}/init.sql" "${init_db_file}"
-  elif [[ "${service_db^^}" == "POSTGRES" ]]; then
-    cp "${working_dir}/configurations/db-files/${service_db,,}/init.sh" "${init_db_file}"
-  fi
 
   # Add superuser create to init.sql file
   ## @TODO: Need to implement for Postgres
@@ -192,17 +195,6 @@ create_docker_files() {
     echo "create user ${db_username} with encrypted password '${db_password}';" >> ${init_db_file}
     echo "grant all privileges on database ${db_name} to ${db_username};" >> ${init_db_file}
   fi
-
-
-  # Make modifications to bash scripts (and set variable values)
-  # @TODO: need to re-examine this
-  printf "\nCopying bash script files ...\n"
-  mkdir "${container_dir}/scripts/"
-  cp -r "${working_dir}/scripts/" "${container_dir}"
-  for bash_script in "${container_dir}"/scripts/*.sh; do
-    sed -i "s/{{project_name}}/${project_name}/g" "${bash_script}"
-    sed -i "s#{{local_container_dir}}#${local_container_dir}#g" "${bash_script}"
-  done
 }
 
 build_docker_images() {
@@ -216,95 +208,71 @@ build_docker_images() {
   ###rm "${init_db_file}"
 }
 
-create_web_root_index_file() {
+build_create_project_script() {
 
-  printf "\nCreating ${root_index_file} ...\n"
+  # ##########################################################################################
+  # Create an entrypoint bash script to create a new PHP project, get a project from a git
+  # repository or make an empty project.
+  # ##########################################################################################
+  create_project_script="${container_dir}/create_project.sh"
 
-  if [ ! -d "${web_root}" ]; then
-    mkdir -p "${web_root}"
+  printf "\nCreating build project script ${create_project_script} ...\n\n"
+  export DIR=${create_project_script%/*}
+  if [ ! -d "${DIR}" ] ; then
+    mkdir -p "${DIR}"
   fi
 
-  root_index_file="${web_root}/index.php"
-  mkdir -p "${container_dir}/${project_name}/public"
-  echo "<?php" > "${root_index_file}"
-  echo "echo <<<EOL" >> "${root_index_file}"
-  echo "<!DOCTYPE html>" >> "${root_index_file}"
-  echo "<html>" >> "${root_index_file}"
-  echo "<head>" >> "${root_index_file}"
-  echo "<meta charset=\"UTF-8\">" >> "${root_index_file}"
-  echo "<title>${project_name}</title>" >> "${root_index_file}"
-  echo "</head>" >> "${root_index_file}"
-  echo "<body>" >> "${root_index_file}"
-  echo "<h2>${project_name}</h2>" >> "${root_index_file}"
-  echo "<hr/>" >> "${root_index_file}"
-  echo "<p>Create your project in the <b>${project_name}-app</b> container in the directory <b style=\"font-family:Courier New;\">/www/var/${project_name}</b>.</p>" >> "${root_index_file}"
-  echo "<ul>" >> "${root_index_file}"
-  echo "<dl><dt>To access the server docker container:</dt><dd><b style=\"font-family:Courier New;\">docker -ti exec ${project_name}-app bash</b></dd></dl>" >> "${root_index_file}"
-  echo "</ul>" >> "${root_index_file}"
-  echo "<table>" >> "${root_index_file}"
-  echo "<tbody>" >> "${root_index_file}"
-  containers_created_str=$(join_by "," ${containers_created[@]})
-  echo "<tr><td>Containers createdL:</td><td>${containers_created_str}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Website URL:</td><td><a href=\"${site_url}\">${site_url}</a></td></tr>" >> "${root_index_file}"
-  echo "<tr><td>${service_db_admin} URL:</td><td><a href=\"${db_admin_url}\" target=\"_blank\">${db_admin_url}</a></td></tr>" >> "${root_index_file}"
-  if [[ "${create_phpinfo_file}" == true ]]; then
-    echo "<tr><td>PHP Information:</td><td><a href=\"${site_url}/phpinfo.php\" target=\"_blank\">${site_url}/phpinfo.php</a></td></tr>" >> "${root_index_file}"
-  fi
-  echo "<tr><td>Docker version:</td><td>${docker_version}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Container directory:</td><td>${container_dir}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>PHP framework:</td><td>${php_framework}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Git repository:</td><td>${git_repo}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Database type:</td><td>${service_db}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Database host/server:</td><td>db-${service_db,,}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Database name:</td><td>db-${db_name}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Database username:</td><td>${db_username}</td></tr>" >> "${root_index_file}"
-  echo "<tr><td>Database password:</td><td>***${db_password: -3}</td></tr>" >> "${root_index_file}"
-  echo "</tbody>" >> "${root_index_file}"
-  echo "</table>" >> "${root_index_file}"
-  echo "</body>" >> "${root_index_file}"
-  echo "</html>" >> "${root_index_file}"
-  echo "EOL;" >> "${root_index_file}"
-}
-
-clone_git_repo() {
-  # Clone a git repository
-  printf "\nCloning get repository ${git_repo} ..."
-  docker exec -w /var/www "${project_name}-app" git clone "${git_repo}" site
-  docker exec -w /var/www "${project_name}-app" composer update
-}
-
-create_php_project() {
-  # ##########################################################################################
-  # Build the a new PHP project or get a project from a git repository
-  # ##########################################################################################
-
-  printf "\nCreating PHP project ..."
+  echo '#!/bin/bash' > "${create_project_script}"
+  echo 'set -o errexit' > "${create_project_script}"
 
   if [[ -z "$git_repo" ]] && [[ -z "$php_framework" ]]; then
-
-    # No PHP framework or git repository specified so just create an <webroot>/index.php file
-    create_web_root_index_file
-
+    # No PHP framework or git repository specified so just create a <webroot>/index.php file
+    cat "${working_dir}/scripts/create_web_root_index_file.sh" >> "${create_project_script}"
   else
     if [[ ! -z "$git_repo" ]]; then
-
       # Install project from a git repository
-      clone_git_repo
-
+      cat "${working_dir}/scripts/git_clone_repo.sh" >> "${create_project_script}"
     else
-
-      # Install a new PHP project for the specified framework
-      framework_install_script="${container_dir}/configurations/php-framework-installs/${php_framework}.sh"
+      framework_install_script="${working_dir}/configurations/php-framework-installs/${php_framework}.sh"
       if [[ ! -f "$framework_install_script" ]]; then
         printf "\n-------------------------------------------------------------------"
         printf "\nPHP frame install file  ${framework_install_script} does not exist."
         printf "\n-------------------------------------------------------------------"
       else
-        source "$framework_install_script"
+        # Install a new PHP project for the specified framework
+        cat "${framework_install_script}" >> "${create_project_script}"
       fi
-
     fi
   fi
+
+  if [[ "${create_phpinfo_file}" == true ]]; then
+    # Create phpinfo.php file
+    cat "${working_dir}/scripts/create_phpinfo_file.sh" >> "${create_project_script}"
+  fi
+
+  # Make modifications to create_project.sh bash script.
+  chmod +x "${create_project_script}"
+  sed -i "s/#!\/bin\/bash.*//g" "${create_project_script}"
+  sed -i '1s/^/#!\/bin\/bash\n/' "${create_project_script}"
+  sed -i "s/{{container_dir}}/${container_dir//\//\\/}/g" "${create_project_script}"
+  sed -i "s/{{db_admin_port}}/${db_admin_port}/g" "${create_project_script}"
+  sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${create_project_script}"
+  sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${create_project_script}"
+  sed -i "s/{{project_name}}/${project_name}/g" "${create_project_script}"
+  sed -i "s/{{port}}/${port}/g" "${create_project_script}"
+  sed -i "s/{{service_db}}/${service_db,,}/g" "${boocreate_project_scripttstrap_file}"
+  sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${create_project_script}"
+  sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${create_project_script}"
+
+  #printf "\n\nRunning ${create_project_script} bash script ...\n\n"
+  ##bash "${create_project_script}"
+
+  #echo "" >> "${create_project_script}"
+  #echo "# Run composer" >> "${create_project_script}"
+  #echo "cd /var/www/site" >> "${create_project_script}"
+  #echo "composer update" >> "${create_project_script}"
+  #echo "exit" >> "${create_project_script}"
+  #exit
 }
 
 run_post_install_processes_OLD(){
@@ -355,19 +323,12 @@ run_post_install_processes(){
   # ##########################################################################################
   # Run post install processes.
   # ##########################################################################################
+  printf "\n\nRunning post-install process ... "
+}
 
-  # Should we create a phpinfo.php file?
-  if [[ "${create_phpinfo_file}" == true ]]; then
-
-    if [ ! -d "${web_root}" ]; then
-      mkdir -p "${web_root}"
-    fi
-
-    phpinfo_file="${web_root}/phpinfo.php"
-    printf "\nCreating ${phpinfo_file} ...\n"
-    echo '<?php' > "${phpinfo_file}"
-    echo 'phpinfo();' >> "${phpinfo_file}"
-  fi
+build_project() {
+  printf "\n\nBuilding project ....\n"
+  docker exec -t "${project_name}-app" bash create_project.sh
 }
 
 get_choice_response() {
@@ -404,7 +365,7 @@ get_yes_or_no_response() {
 }
 
 set_php_framework_or_git_repo() {
-  printf "\nSelect the PHP framework or enter a git repository."
+  printf "\nEnter the git repository or select a PHP framework from the following list."
   options=("(none)")
   for framework in "${php_frameworks[@]}"; do
     options+=("${framework}")
@@ -419,32 +380,50 @@ set_php_framework_or_git_repo() {
   valid_response=false
   while [[ "${valid_response}" == false ]]; do
     read response
-    if [[ "$response" -gt 0 && "$response" -le "${#options[@]}" ]]; then
-      valid_response=true
-      if [[ "$response" -gt 1 ]]; then
-        valid_response=true
-        selected_index=$((${response} - 2))
-        php_framework="${php_frameworks[$selected_index]}"
-      else
-        php_framework=""
-      fi
-      get_repo=""
-    elif [[ ! -z "${response}" ]]; then
+    re='^[0-9]+$'
+    if [[ -z "${response}" ]]; then
+      valid_response=false
+      selected_index=""
+      php_framework=""
+      git_repo=""
+    elif ! [[ "${response/-/}" =~ $re ]]; then
+      # Not a number (Assume a git repository)
       if (git ls-remote "${response}" -q 2>&1); then
         valid_response=true
+        selected_index=""
         php_framework=""
         git_repo="${response}"
       else
         printf "\nGit repository does not exist or it is not accessible.\n"
+        printf "\nSelect a number or enter a valid git repository.\n"
+        valid_response=false
+        selected_index=""
+        php_framework=""
+        git_repo=""
       fi
+    elif [[ "$response" -eq 1 ]]; then
+      valid_response=true
+      selected_index=$((${response}))
+      php_framework=""
+      git_repo=""
+    elif [[ "$response" -gt 1 && "$response" -le "${#options[@]}" ]]; then
+      valid_response=true
+      selected_index=$((${response} - 2))
+      php_framework="${php_frameworks[$selected_index]}"
+      git_repo=""
     else
+      printf "\nSelect a valid number or enter a git repository.\n"
+      valid_response=false
+      selected_index=""
       php_framework=""
       git_repo=""
     fi
   done
   if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
+    local_web_root="/var/www/site/webroot"
     web_root="${site_dir}/webroot"
   elif [[ "${php_framework^^}" == "YII2" ]]; then
+    local_web_root="/var/www/site/web"
     web_root="${site_dir}/web"
   fi
 }
@@ -546,6 +525,7 @@ fi
 container_dir="${container_base_dir}/${project_name}"
 local_container_dir="/var/www/${project_name}"
 db_name="${project_name//[\-]/_}"
+create_project_script="${container_dir}/create_project.sh"
 
 # Get the container directory
 printf "\nEnter the directory for the container or just hit [Enter]\n"
@@ -733,23 +713,29 @@ if [[ "${response^^}" == "Q" ]]; then
   exit
 fi
 
+# Create the project code
+#create_project_code
+# Create the bootstrap.sh file
 
 # Define the docker files
 define_docker_files
 
 # Create the docker files
 create_docker_files
+create_server_conf_file
+create_db_init_file
+build_create_project_script
 
 # Build the docker images
 build_docker_images
-
-# Create the PHP project
-create_php_project
 
 # Run post-install process
 run_post_install_processes
 
 populate_containers_created_array
+
+printf "\n\nBuilding project ....\n"
+docker exec -t "${project_name}-app" bash create_project.sh
 
 script_completed=true
 

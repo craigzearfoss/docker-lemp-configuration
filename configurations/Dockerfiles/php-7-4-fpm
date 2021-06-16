@@ -26,8 +26,12 @@ RUN apt-get -y update \
     && docker-php-ext-configure intl \
     && docker-php-ext-install intl
 
-# Needed for CodeIgniter
+# Needed for CodeIgniter and other php frameworks
 RUN docker-php-ext-install mysqli
+
+#RUN apt-get -y update \
+#    && apt-get install php7.4-curl \
+#    && apt-get install php-xml
 
 # Install XDebug
 RUN pecl install xdebug \
@@ -47,7 +51,15 @@ RUN useradd -G www-data,root -u $uid -d /home/$user $user
 RUN mkdir -p /home/$user/.composer && \
     chown -R $user:$user /home/$user
 
+#ADD /scripts /scripts
+#RUN chmod +x /scripts/*
+
+# Copy the script that builds the project
+COPY /create_project.sh /var/www/create_project.sh
+RUN chmod +x /var/www/create_project.sh
+
 # Set working directory
 WORKDIR /var/www
 
 USER $user
+
