@@ -26,7 +26,7 @@ RUN apt-get -y update \
     && docker-php-ext-configure intl \
     && docker-php-ext-install intl
 
-# Needed for CodeIgniter
+# Install additional PHP extensions
 RUN docker-php-ext-install mysqli
 
 # Install XDebug
@@ -37,7 +37,8 @@ RUN pecl install xdebug \
 
 # Install vim and nano
 RUN apt-get -y update \
-    && apt-get install -y vim nano
+    && apt-get install -y vim nano \
+    && apt install wget
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

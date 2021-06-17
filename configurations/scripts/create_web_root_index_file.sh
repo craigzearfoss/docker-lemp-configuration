@@ -8,6 +8,21 @@ else
 
   root_index_file="{{local_web_root}}/index.php"
 
+  # Set variables
+  env_file="/var/www/site/.env"
+  db_admin_port="{{db_admin_port}}"
+  db_exposed_port="{{db_exposed_port}}"
+  db_name="{{db_name}}"
+  db_password="{{db_password}}"
+  db_username="{{db_username}}"
+  full_install={{full_install}}
+  git_repo="{{git_repo}}"
+  local_web_root="{{local_web_root}}"
+  port="{{port}}"
+  project_name="{{project_name}}"
+  service_db="{{service_db}}"
+  web_root="{{web_root}}"
+
   export DIR=${root_index_file%/*}
   if [ ! -d "${DIR}" ] ; then
     mkdir -p "${DIR}"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Clone a git repository
-echo  "Cloning CodeIgniter project ..."
+echo  "Cloning git repository ..."
 if [ -d "/var/www/site" ]; then
   echo "Directory /var/www/site already exists."
   echo "Delete it and rerun this script."

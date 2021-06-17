@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions (Needed for CodeIgniter)
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+RUN docker-php-ext-install pdo_mysql exif pcntl bcmath gd
 
 # Install intl PHP extension
 RUN apt-get -y update \
@@ -26,12 +26,8 @@ RUN apt-get -y update \
     && docker-php-ext-configure intl \
     && docker-php-ext-install intl
 
-# Needed for CodeIgniter and other php frameworks
+# Install additional PHP extensions
 RUN docker-php-ext-install mysqli
-
-#RUN apt-get -y update \
-#    && apt-get install php7.4-curl \
-#    && apt-get install php-xml
 
 # Install XDebug
 RUN pecl install xdebug \

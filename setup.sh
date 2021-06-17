@@ -39,12 +39,9 @@ dd_admin_port=$((${dd_admin_port} + 1))
 db_services=("MySQL" "MariaDB" "Postgres")
 
 # Get a list of available PHP frameworks
-# @TODO: Need to add Phalcon  WordPress Drupal
 php_frameworks=()
-search_dir="/home/craig/Documents/temp/docker-auto-compose/configurations/php-framework-installs"
-for entry in "${working_dir}"/configurations/php-framework-installs/*; do
-  filename="${entry##*/}"
-  php_frameworks+=("${filename%.*}")
+for entry in configurations/php-frameworks/*; do
+  php_frameworks+=("${entry##*/}")
 done
 
 frameworks_with_partial_installs=("Symfony")
@@ -227,13 +224,13 @@ build_create_project_script() {
 
   if [[ -z "$git_repo" ]] && [[ -z "$php_framework" ]]; then
     # No PHP framework or git repository specified so just create a <webroot>/index.php file
-    cat "${working_dir}/scripts/create_web_root_index_file.sh" >> "${create_project_script}"
+    cat "${working_dir}/configurations/scripts/create_web_root_index_file.sh" >> "${create_project_script}"
   else
     if [[ ! -z "$git_repo" ]]; then
       # Install project from a git repository
-      cat "${working_dir}/scripts/git_clone_repo.sh" >> "${create_project_script}"
+      cat "${working_dir}/configurations/scripts/git-clone_repo.sh" >> "${create_project_script}"
     else
-      framework_install_script="${working_dir}/configurations/php-framework-installs/${php_framework}.sh"
+      framework_install_script="${working_dir}/configurations/php-frameworks/${php_framework}/install.sh"
       if [[ ! -f "$framework_install_script" ]]; then
         printf "\n-------------------------------------------------------------------"
         printf "\nPHP frame install file  ${framework_install_script} does not exist."
@@ -245,35 +242,111 @@ build_create_project_script() {
     fi
   fi
 
+  # Add project initialization code to the script
+  if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
+    initialize_cakephp_project
+  elif [[ "${php_framework^^}" == "CODEIGNITER" ]]; then
+    initialize_codeigniter_project
+  elif [[ "${php_framework^^}" == "FUELPHP" ]]; then
+    initialize_fuelphp_project
+  elif [[ "${php_framework^^}" == "LAMINAS" ]]; then
+    initialize_laminas_project
+  elif [[ "${php_framework^^}" == "LARAVEL" ]]; then
+    initialize_laravel_project
+  elif [[ "${php_framework^^}" == "LUMEN" ]]; then
+    initialize_lumen_project
+  elif [[ "${php_framework^^}" == "PHALCON" ]]; then
+    initialize_phalcon_project
+  elif [[ "${php_framework^^}" == "SLIM" ]]; then
+    initialize_slim_project
+  elif [[ "${php_framework^^}" == "SYMFONY" ]]; then
+    initialize_symfony_project
+  elif [[ "${php_framework^^}" == "WORDPRESS" ]]; then
+    initialize_wordpress_project
+  elif [[ "${php_framework^^}" == "YII2" ]]; then
+    initialize_yii2_project
+  fi
+
   if [[ "${create_phpinfo_file}" == true ]]; then
     # Create phpinfo.php file
-    cat "${working_dir}/scripts/create_phpinfo_file.sh" >> "${create_project_script}"
+    cat "${working_dir}/configurations/scripts/create_phpinfo_file.sh" >> "${create_project_script}"
   fi
+
+  # Add development-only files to .gitignore file
+  cat "${working_dir}/configurations/scripts/git-add_dev_only_files_to_gitignore.sh" >> "${create_project_script}"
 
   # Make modifications to create_project.sh bash script.
   chmod +x "${create_project_script}"
   sed -i "s/#!\/bin\/bash.*//g" "${create_project_script}"
   sed -i '1s/^/#!\/bin\/bash\n/' "${create_project_script}"
-  sed -i "s/{{container_dir}}/${container_dir//\//\\/}/g" "${create_project_script}"
   sed -i "s/{{db_admin_port}}/${db_admin_port}/g" "${create_project_script}"
   sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${create_project_script}"
-  sed -i "s/{{full_install}}/${full_install}/g" "${create_project_script}"
+  sed -i "s/{{db_name}}/${db_name}/g" "${create_project_script}"
+  sed -i "s/{{db_password}}/${db_password}/g" "${create_project_script}"
+  sed -i "s/{{db_username}}/${db_username}/g" "${create_project_script}"
+  sed -i "s/{{full_install}}/true/g" "${create_project_script}"
   sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${create_project_script}"
-  sed -i "s/{{project_name}}/${project_name}/g" "${create_project_script}"
-  sed -i "s/{{port}}/${port}/g" "${create_project_script}"
-  sed -i "s/{{service_db}}/${service_db,,}/g" "${boocreate_project_scripttstrap_file}"
-  sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${create_project_script}"
   sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${create_project_script}"
+  sed -i "s/{{port}}/${port}/g" "${create_project_script}"
+  sed -i "s/{{project_name}}/${project_name}/g" "${create_project_script}"
+  sed -i "s/{{service_db}}/${service_db}/g" "${create_project_script}"
+  sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${create_project_script}"
+}
 
-  #printf "\n\nRunning ${create_project_script} bash script ...\n\n"
-  ##bash "${create_project_script}"
+initialize_cakephp_project() {
+  printf ""
+}
 
-  #echo "" >> "${create_project_script}"
-  #echo "# Run composer" >> "${create_project_script}"
-  #echo "cd /var/www/site" >> "${create_project_script}"
-  #echo "composer update" >> "${create_project_script}"
-  #echo "exit" >> "${create_project_script}"
-  #exit
+initialize_codeigniter_project() {
+  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/initialize_env.sh" >> "${create_project_script}"
+  if [[ $run_db_migrations == true ]]; then
+    cat "${working_dir}/configurations/php-frameworks/CodeIgniter/migrate.sh" >> "${create_project_script}"
+  fi
+  if [[ $run_db_seeds == true ]]; then
+    cat "${working_dir}/configurations/php-frameworks/CodeIgniter/seed.sh" >> "${create_project_script}"
+  fi
+}
+
+initialize_fuelphp_project() {
+  printf ""
+}
+
+initialize_laminas_project() {
+  printf ""
+}
+
+initialize_laravel_project() {
+  cat "${working_dir}/configurations/scripts/laravel-initialize_env.sh" >> "${create_project_script}"
+  if [[ $run_db_migrations == true ]]; then
+    cat "${working_dir}/configurations/scripts/laravel-migrate.sh" >> "${create_project_script}"
+  fi
+  if [[ $run_db_seeds == true ]]; then
+    cat "${working_dir}/configurations/scripts/laravel-seed.sh" >> "${create_project_script}"
+  fi
+}
+
+initialize_lumen_project() {
+  printf ""
+}
+
+initialize_phalcon_project() {
+  printf ""
+}
+
+initialize_slim_project() {
+  printf ""
+}
+
+initialize_symfony_project() {
+  printf ""
+}
+
+initialize_wordpress_project() {
+  printf ""
+}
+
+initialize_yii2_project() {
+  printf ""
 }
 
 run_post_install_processes_OLD(){
@@ -313,11 +386,6 @@ run_post_install_processes_OLD(){
     fi
 
   fi
-
-
-  # Add any development environment files to .gitignore
-  docker exec -w /var/www/scripts "${project_name}-app" bash add_dev_only_files_to_gitignore.sh
-  add_dev_only_files_to_gitignore.sh
 }
 
 run_post_install_processes(){
