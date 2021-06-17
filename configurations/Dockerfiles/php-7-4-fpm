@@ -41,7 +41,8 @@ RUN pecl install xdebug \
 
 # Install vim and nano
 RUN apt-get -y update \
-    && apt-get install -y vim nano
+    && apt-get install -y vim nano \
+    && apt install wget
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

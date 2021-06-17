@@ -1,12 +1,31 @@
 #!/bin/bash
 
-printf "\nCreating Symfony project ...\n"
-if [[ "${full_install}" == true ]]; then
-  docker exec -w /var/www "${project_name}-app" composer create-project symfony/website-skeleton site
-else
-  docker exec -w /var/www "${project_name}-app" composer create-project symfony/skeleton site
+# Create Symfony project
+echo  "Creating Symfony project ..."
+if [ -d "/var/www/site" ]; then
+  echo "Directory /var/www/site already exists."
+  echo "Delete it and rerun this script."
+  exit
 fi
 
-#  printf "\nUpdating .env file and configuration settings ...\n"
-#  docker-compose exec app echo "DB_USER=${db_username}" >> "${local_container_dir}/.local.env"
-#  docker-compose exec app echo "DB_PASS=${db_password}" >> "${local_container_dir}/.local.env"
+if [ ! -d "/var/www" ]; then
+  mkdir -p "/var/www"
+fi
+
+# Create project
+if [ -d "/var/www/site" ]; then
+  rm -Rf /var/www/site
+fi
+
+cd /var/www
+
+full_install= {{full_install}}
+if [[ "${full_install}" == true ]]; then
+  composer create-project symfony/website-skeleton site
+else
+  composer create-project symfony/skeleton site
+fi
+
+# Install vendor files
+cd /var/www/site
+composer update

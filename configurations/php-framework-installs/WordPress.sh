@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Create Lumen project
-echo  "Creating Lumen project ..."
+# Create WordPress project
+echo  "Creating WordPress project ..."
 if [ -d "/var/www/site" ]; then
   echo "Directory /var/www/site already exists."
   echo "Delete it and rerun this script."
@@ -19,8 +19,5 @@ fi
 
 cd /var/www
 
-composer create-project --prefer-dist laravel/lumen site
-
-# Install vendor files
-cd /var/www/site
-composer update
+wget https://wordpress.org/latest.tar.gz
+tar -xzvf latest.tar.gz

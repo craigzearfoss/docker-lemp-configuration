@@ -1,16 +1,26 @@
 #!/bin/bash
 
-printf "\nCreating Laravel project ...\n"
+# Create Laravel project
+echo  "Creating Laravel project ..."
+if [ -d "/var/www/site" ]; then
+  echo "Directory /var/www/site already exists."
+  echo "Delete it and rerun this script."
+  exit
+fi
+
+if [ ! -d "/var/www" ]; then
+  mkdir -p "/var/www"
+fi
+
+# Create project
+if [ -d "/var/www/site" ]; then
+  rm -Rf /var/www/site
+fi
+
 cd /var/www
+
 composer create-project laravel/laravel site
 
-#  printf "\nUpdating .env file and configuration settings ...\n"
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_ENV=.*/APP_ENV=local/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" php artisan key:generate
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/APP_URL=.*/APP_URL=http:\/\/localhost:${port}/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_HOST=.*/DB_HOST=db-${service_db}/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PORT=.*/DB_PORT=${db_port}/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/" .env
-#  docker exec -w "${local_container_dir}" "${project_name}-app" sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/" .env
+# Install vendor files
+cd /var/www/site
+composer update

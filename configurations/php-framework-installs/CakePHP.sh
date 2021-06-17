@@ -1,11 +1,27 @@
 #!/bin/bash
 
-printf "\nCreating CakePHP project ...\n"
-docker exec -w /var/www "${project_name}-app" composer create-project --prefer-dist cakephp/app:~4.0 site
-#composer create-project --prefer-dist cakephp/app:~4.0 --working-dir="${container_dir}" "${project_name}"
+# Create CakePHP project
+echo  "Creating CakePHP project ..."
+if [ -d "/var/www/site" ]; then
+  echo "Directory /var/www/site already exists."
+  echo "Delete it and rerun this script."
+  exit
+fi
 
-#  cp "${container_dir}/config/.env.example" "${container_dir}/config/.env"
+if [ ! -d "/var/www" ]; then
+  mkdir -p "/var/www"
+fi
 
-#  printf "\nUpdating .env file and configuration settings ...\n"
-#  docker-compose exec app sed -i "s/export APP_NAME=.*/export APP_NAME=\"${project_name}\"/g" "${local_container_dir}/config/.env"
-#  docker-compose exec app sed -i "s/export SECURITY_SALT=.*/export SECURITY_SALT=\"$(openssl rand -base64 6)\"/g" "${local_container_dir}/config/.env"
+# Create project
+if [ -d "/var/www/site" ]; then
+  rm -Rf /var/www/site
+fi
+
+cd /var/www
+
+composer create-project --prefer-dist cakephp/app:~4.0 site
+
+# Install vendor files
+cd /var/www/site
+composer update
+

@@ -257,6 +257,7 @@ build_create_project_script() {
   sed -i "s/{{container_dir}}/${container_dir//\//\\/}/g" "${create_project_script}"
   sed -i "s/{{db_admin_port}}/${db_admin_port}/g" "${create_project_script}"
   sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${create_project_script}"
+  sed -i "s/{{full_install}}/${full_install}/g" "${create_project_script}"
   sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${create_project_script}"
   sed -i "s/{{project_name}}/${project_name}/g" "${create_project_script}"
   sed -i "s/{{port}}/${port}/g" "${create_project_script}"
@@ -422,6 +423,10 @@ set_php_framework_or_git_repo() {
   if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
     local_web_root="/var/www/site/webroot"
     web_root="${site_dir}/webroot"
+  elif [[ "${php_framework^^}" == "WORDPRESS" ]]; then
+    site_dir="${container_dir}/wordpress"
+    local_web_root="/var/www/wordpress"
+    web_root="${site_dir}"
   elif [[ "${php_framework^^}" == "YII2" ]]; then
     local_web_root="/var/www/site/web"
     web_root="${site_dir}/web"
@@ -743,10 +748,16 @@ script_completed=true
 display_configuration
 
 printf "\nYou can now access the following in your browser:"
-printf "\n\n\tWebsite:         ${site_url}\n"
+printf "\n\tWebsite:         ${site_url}\n"
+if [[ "${php_framework^^}" == "WORDPRESS" ]]; then
+  printf "\n\t    Database Name: ${project_name}"
+  printf "\n\t    Username:      ${db_username}"
+  printf "\n\t    Password:      ***${db_password: -3}"
+  printf "\n\t    Database Host: db-${service_db,,}"
+fi
 if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\tphpMyAdmin:      ${db_admin_url}"
-  printf "\n\t    Server:   db-${service_db}"
+  printf "\n\t    Server:   db-${service_db,,}"
   printf "\n\t    Username: ${db_username}"
   printf "\n\t    Password: ***${db_password: -3}"
 elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
@@ -755,8 +766,14 @@ fi
 if [[ "${create_phpinfo_file}" == true ]]; then
   printf "\n\tPHP Information: ${site_url}/phpinfo.php"
 fi
-printf "\n"
 
+printf "\n\nTo access the Docker container:"
+printf "\n\tdocker exect -it ${project_name}-app bash"
+
+printf "\n\nTo destroy all Docker containers that were created:"
+printf "\n\tbash destroy.sh ${project_name}\n"
+
+printf "\n===>${php_framework}<=====>${git_rep}<====\n\n"
 if [[ -z "${php_framework}" ]] && [[ -z "${git_rep}" ]]; then
   printf "\nCreate your project in the ${project_name}-app container in the directory /www/var/${project_name}.\n\n"
 fi

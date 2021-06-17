@@ -1,7 +1,7 @@
 #!/bin/bash
-
-# Create Lumen project
-echo  "Creating Lumen project ..."
+## @TODO: This isn't working yet
+# Create Laminas project
+echo  "Creating Laminas project ..."
 if [ -d "/var/www/site" ]; then
   echo "Directory /var/www/site already exists."
   echo "Delete it and rerun this script."
@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project --prefer-dist laravel/lumen site
+composer require --dev laminas/laminas-component-installer
 
 # Install vendor files
 cd /var/www/site
