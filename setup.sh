@@ -750,18 +750,18 @@ display_configuration
 printf "\nYou can now access the following in your browser:"
 printf "\n\tWebsite:         ${site_url}\n"
 if [[ "${php_framework^^}" == "WORDPRESS" ]]; then
-  printf "\n\t    Database Name: ${project_name}"
+  printf "\t    Database Name: ${project_name}"
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}"
-  printf "\n\t    Database Host: db-${service_db,,}"
+  printf "\n\t    Database Host: db-${service_db,,}\n"
 fi
 if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
-  printf "\tphpMyAdmin:      ${db_admin_url}"
+  printf "\n\tphpMyAdmin:      ${db_admin_url}"
   printf "\n\t    Server:   db-${service_db,,}"
   printf "\n\t    Username: ${db_username}"
-  printf "\n\t    Password: ***${db_password: -3}"
+  printf "\n\t    Password: ***${db_password: -3}\n"
 elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
-  printf "\tpgAdmin:           http://localhost:${db_admin_port}"
+  printf "\tpgAdmin:           http://localhost:${db_admin_port}\n"
 fi
 if [[ "${create_phpinfo_file}" == true ]]; then
   printf "\n\tPHP Information: ${site_url}/phpinfo.php"
