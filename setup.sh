@@ -14,6 +14,8 @@ containers_created=()
 
 create_app_service=true
 
+node_version=""
+node_versions=("12.6.0")
 project_name=$1
 php_framework=""
 git_repo=""
@@ -59,11 +61,346 @@ db_admin_url="http://localhost:${db_admin_port}"
 create_phpinfo_file="N"
 create_project_script="create_project_script"
 
+get_choice_response() {
+  local __options=("$@")
+
+  i=1
+  for name in "${__options[@]}"; do
+    printf "\n\t${i} - ${name##*/}"
+    i=$((${i} + 1))
+  done
+  printf "\n"
+
+  response=0
+  while [[ response -lt 1 || response -gt "${#__options[@]}" ]]; do
+    read response
+  done
+  response=$((${response} - 1))
+}
+
+get_yes_or_no_response() {
+  local __default=$1
+  valid_yes_no_responses=("Y N")
+  good_reply=false
+  while [ "$good_reply" != true ]; do
+    read response
+    if [[ -z "${response}" ]] && [[ ! -z "${__default}" ]]; then
+      response="${__default}"
+    fi
+    response=${response^^}
+    if [[ " ${valid_yes_no_responses[@]} " =~ " ${response} " ]]; then
+      good_reply=true
+    fi
+  done
+}
+
+continue_confirmation() {
+  printf "\nEnter [C] to continue or [Q] to quit.\n"
+  response=""
+  while [[ "${response^^}" != "C" ]] && [[ "${response^^}" != "Q" ]]; do
+    read response
+  done
+  if [[ "${response^^}" == "Q" ]]; then
+    printf "\n"
+    exit
+  fi
+}
 
 join_by() {
   local IFS="$1";
   shift;
   echo "$*";
+}
+
+set_project_name() {
+  if [ -z "${project_name}" ]; then
+    printf "\nEnter the project name. (Can only contain letters, numbers, underscores and dashes.)"
+    valid_project_name=false
+    while [ "${valid_project_name}" != true ]; do
+      read  project_name
+      if [[ "${project_name}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+        valid_project_name=true
+      else
+        valid_project_name=false
+      fi
+    done
+  fi
+  container_dir="${container_base_dir}/${project_name}"
+  local_container_dir="/var/www/${project_name}"
+  db_name="${project_name//[\-]/_}"
+  create_project_script="${container_dir}/create_project.sh"
+}
+
+set_container_directory() {
+  printf "\nEnter the directory for the container or just hit [Enter]\n"
+  printf "to use the directory ${container_base_dir}.\n"
+  read custom_base_dir
+  custom_base_dir="${custom_base_dir:-${container_base_dir}}"
+  container_base_dir="${custom_base_dir}"
+  if [ ! -d "${container_base_dir}" ]; then
+    printf "\nThe directory ${container_base_dir} does not exist. Please create it and then rerun this script.\n"
+    exit
+  fi
+  container_dir="${container_base_dir}/${project_name}"
+  if [ -d "${container_dir}" ]; then
+    printf "\nThe directory ${container_dir} already exists. Delete or rename it and then rerun this script.\n"
+    exit
+  fi
+}
+
+set_server_service() {
+  service_server="NGINX"
+  printf "\nSelect ${service_server} version:"
+  get_choice_response "${dockerfiles[@]}"
+  dockerfile="${dockerfiles[$response]}"
+  server_version="${dockerfile##*/}"
+}
+
+set_port() {
+  port_is_in_use=true
+  select_a_port_prompt="\nSelect a port [${default_port}]: "
+  while [[ "${port_is_in_use}" == true ]]; do
+    printf "${select_a_port_prompt}\n"
+    read port
+    port="${port:-${default_port}}"
+    if [[ "$port" -lt 1024 ||"$port" -gt 65535 ]]; then
+      select_a_port_prompt="\nA port must be in the range 1024 to 65535. Select a different port. [${default_port}] "
+    elif [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
+      select_a_port_prompt="\nPort ${port} is in use. Select a different port. [${default_port}] "
+      port_is_in_use=true
+    else
+      port_is_in_use=false
+    fi
+  done
+  site_url="http://localhost:${port}"
+}
+
+set_git_repo() {
+  printf "\nEnter the git repository or leave blank if"
+  printf "\nyou are going to create a new project.\n"
+  valid_response=false
+  while [[ "${valid_response}" == false ]]; do
+    read response
+
+    if [ -z "${response}" ]; then
+      valid_response=true
+      git_repo=""
+    elif (git ls-remote "${response}" -q 2>&1); then
+      valid_response=true
+      git_repo="${response}"
+    else
+      printf "\nGit repository does not exist or it is not accessible.\n"
+      valid_response=false
+      git_repo=""
+    fi
+  done
+}
+
+set_php_framework() {
+  if [[ -z "${git_repo}" ]]; then
+    printf "\nSelect the PHP framework to install."
+  else
+    printf "\nSelect the PHP framework of the repository."
+    printf "\nThis used to automatically configure the project environment settings."
+    printf "\nIf you do not know the framework or do not want it configured then select '(none)'."
+  fi
+  options=("(none)")
+  for framework in "${php_frameworks[@]}"; do
+    options+=("${framework}")
+  done
+
+  i=1
+  for name in "${options[@]}"; do
+    printf "\n\t${i} - ${name##*/}"
+    i=$((${i} + 1))
+  done
+  printf "\n"
+  valid_response=false
+  while [[ "${valid_response}" == false ]]; do
+    read response
+    re='^[0-9]+$'
+    if [[ -z "${response}" ]]; then
+      valid_response=false
+      selected_index=""
+      php_framework=""
+    elif [[ "$response" -eq 1 ]]; then
+      valid_response=true
+      selected_index=$((${response}))
+      php_framework=""
+    elif [[ "$response" -gt 1 && "$response" -le "${#options[@]}" ]]; then
+      valid_response=true
+      selected_index=$((${response} - 2))
+      php_framework="${php_frameworks[$selected_index]}"
+    else
+      printf "\nSelect a valid number.\n"
+      valid_response=false
+      selected_index=""
+      php_framework=""
+    fi
+  done
+  if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
+    local_web_root="/var/www/site/webroot"
+    web_root="${site_dir}/webroot"
+  elif [[ "${php_framework^^}" == "WORDPRESS" ]]; then
+    site_dir="${container_dir}/wordpress"
+    local_web_root="/var/www/wordpress"
+    web_root="${site_dir}"
+  elif [[ "${php_framework^^}" == "YII2" ]]; then
+    local_web_root="/var/www/site/web"
+    web_root="${site_dir}/web"
+  fi
+}
+
+is_this_a_full_install() {
+  if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]]; then
+    printf "\nIs this a full install? [Y]"
+    get_yes_or_no_response "Y"
+    if [[ "${response}" == "Y" ]]; then
+      full_install=true
+    else
+      full_response=false
+    fi
+  fi
+}
+
+set_mailhog_service() {
+  printf "\nCreate a MailHog container? [N]\n"
+  get_yes_or_no_response "N"
+  if [[ "${response}" == "Y" ]]; then
+    service_email="MailHog"
+  else
+    service_email=""
+  fi
+}
+
+set_database_name() {
+  printf "\nEnter the database name: [${db_name}]\n"
+  valid_response=false
+  while [[ "${valid_response}" == false ]]; do
+    read response
+    if [ -z "${response}" ]; then
+      valid_response=true
+    elif [[ "${response}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+      valid_response=true
+      db_name="${response}"
+    else
+      valid_response=false
+      printf "\nDatabase name can only contain letters, numbers and underscores.\n"
+    fi
+  done
+}
+
+set_database_service() {
+  printf "\nSelect the database:"
+  get_choice_response "${db_services[@]}"
+  service_db="${db_services[$response]}"
+
+  set_database_name
+
+  # Get database ports
+  if [[ "${service_db}^^" == "MYSQL" ]] || [[ "${service_db}^^" == "MARIADB" ]]; then
+    db_port=3306
+    db_exposed_port=6603
+  elif [[ "${service_db}^^" == "POSTGRES" ]]; then
+    db_port=5432
+    db_exposed_port=5432
+  fi
+  while [[ $(nc -w5 -z -v localhost "${db_exposed_port}" 2>&1) == *"succeeded"* ]]; do
+    db_exposed_port=$((${db_exposed_port} + 1))
+  done
+}
+
+set_database_admin_service() {
+  if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
+    service_db_admin="phpMyAdmin"
+  elif [[ "${service_db^^}" == "POSTGRES" ]]; then
+    service_db_admin="pgAdmin"
+  else
+    service_db_admin=""
+  fi
+  if [[ ! -z "${service_db_admin}" ]]; then
+    printf "\nCreate a ${service_db_admin} container? [Y]\n"
+    get_yes_or_no_response "Y"
+    if [[ "${response}" == "N" ]]; then
+      service_db_admin=""
+    fi
+  fi
+  if [[ ! -z "${service_db_admin}" ]]; then
+    db_admin_port=$(($port + 1))
+    while [[ $(nc -w5 -z -v localhost "${db_admin_port}" 2>&1) == *"succeeded"* ]]; do
+      db_admin_port=$((db_admin_port + 1))
+    done
+  fi
+  db_admin_url="http://localhost:${db_admin_port}"
+}
+
+configure_database() {
+  # Get database root password
+  printf "\nEnter database root password.\n"
+  db_root_password=
+  while [ -z "$db_root_password" ]; do
+    read db_root_password
+  done
+
+  # Get database username
+  db_username=
+  valid_username=false
+  printf "\nEnter database username.\n"
+  while [ "$valid_username" = false ]; do
+    read db_username
+    if [ -z "$db_username" ]; then
+      valid_username=false
+    elif [[ ! ($db_username =~ ^[A-Za-z0-9_-]+$) ]]; then
+    printf "User name can only contain alphanumeric characters, underscores and dashes.\n"
+      valid_username=false
+    elif [[ $(expr length "$db_username") -gt 20 ]]; then
+      printf "User name can be no longer than 20 characters.\n"
+      valid_username=false
+    else
+      valid_username=true
+    fi
+  done
+
+  # Get database user password
+  printf "\nEnter database user password.\n"
+  db_password=
+  while [ -z "$db_password" ]; do
+    read db_password
+  done
+}
+
+run_database_migrations() {
+  if [[ "${frameworks_with_db_migrations[@]}" =~ "${php_framework}" ]]; then
+    printf "\nRun database migrations? [Y]\n"
+    get_yes_or_no_response "Y"
+    if [[ "${response}" == "Y" ]]; then
+      run_db_migrations=true
+    else
+      run_db_migrations=false
+    fi
+  fi
+}
+
+run_database_seeds() {
+  if [[ "${frameworks_with_db_seeds[@]}" =~ "${php_framework}" ]]; then
+    printf "\nRun database seeds? [Y]\n"
+    get_yes_or_no_response "Y"
+    if [[ "${response}" == "Y" ]]; then
+      run_db_seeds=true
+    else
+      run_db_seeds=false
+    fi
+  fi
+}
+
+set_phpinfo_file() {
+  printf "\nCreate a http://localhost:${port}/phpinfo.php file? [Y]\n"
+  get_yes_or_no_response "Y"
+  if [[ "${response}" == "Y" ]]; then
+    create_phpinfo_file=true
+  else
+    create_phpinfo_file=false
+  fi
 }
 
 define_docker_files() {
@@ -88,13 +425,16 @@ create_docker_files() {
   # Create the docker containers.
   # ##########################################################################################
 
-  printf "\n\nCopying configuration files ...\n"
+  # Copy Dockerfile
+  printf "\nCopying configurations ..."
   mkdir -p "${container_dir}"
-  cp "${working_dir}/configurations/Dockerfiles/${server_version}" "${docker_file}"
   cp -pr "${working_dir}/configurations/" "${container_dir}/configurations"
 
-  # Create docker-compose.yml file.
-  printf "Creating docker-compose.yml ...\n"
+  printf "\nCopying Dockerfile ..."
+  cp "${working_dir}/configurations/Dockerfiles/${server_version}" "${docker_file}"
+
+  # Create docker-compose.yml file
+  printf "\nCreating docker-compose.yml ..."
   echo "version: \"${docker_version}\"" > "${docker_compose_file}"
   echo "services:" >> "${docker_compose_file}"
 
@@ -122,7 +462,7 @@ create_docker_files() {
   cat "${working_dir}/configurations/docker-compose-sections/volumes" >> "${docker_compose_file}"
 
   # Make modifications to docker-compose.yml file.
-  printf "Updating docker-compose.yml file ...\n"
+  printf "\nUpdating docker-compose.yml ..."
   sed -i "s/{{project_name}}/${project_name}/g" ${docker_compose_file}
   sed -i "s/{{port}}/${port}/g" ${docker_compose_file}
   sed -i "s/{{service_db}}/${service_db,,}/g" ${docker_compose_file}
@@ -132,6 +472,7 @@ create_docker_files() {
 
 create_server_conf_file() {
   #server configuration
+  printf "\nCopying conf-files/${server_conf_file##*/} ..."
 
   # copy server configuration file
   export DIR=${server_conf_file%/*}
@@ -143,6 +484,7 @@ create_server_conf_file() {
   fi
 
   # Make modifications to the server configuration file.
+  printf "\nUpdating conf-files/${server_conf_file##*/} ..."
   if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
     sed -i "s/server_name .*/server_name localhost;/g" ${server_conf_file}
     sed -i "s/[::]:80 /[::]:${port}/g" ${server_conf_file}
@@ -163,19 +505,21 @@ create_server_conf_file() {
 create_db_init_file() {
   # entrypoint file(s)
 
-  # copy db entrypoint file
-  export DIR=${init_db_file%/*}
-  mkdir -p "${DIR}"
-  cp "${container_dir}/configurations/db-files/${service_db,,}/${init_db_file##*/}" "${init_db_file}"
-
-  printf "Adding database credentials ...\n"
+  printf "\nAdding database credentials ..."
   export DB_DATABASE="${db_name}"
   export DB_ROOT_PASSWORD="${db_root_password}"
   export DB_USERNAME="${db_username}"
   export DB_PASSWORD="${db_password}"
 
+  # copy db entrypoint file
+  printf "\nCopying init-files/${init_db_file##*/} ..."
+  export DIR=${init_db_file%/*}
+  mkdir -p "${DIR}"
+  cp "${container_dir}/configurations/db-files/${service_db,,}/${init_db_file##*/}" "${init_db_file}"
+
   # Add superuser create to init.sql file
   ## @TODO: Need to implement for Postgres
+  printf "\nUpdating init-files/${init_db_file##*/} ..."
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
     echo "" >> ${init_db_file}
     echo "/*" >> ${init_db_file}
@@ -250,17 +594,6 @@ initialize_yii2_project() {
   printf ""
 }
 
-build_docker_images() {
-  printf "Building Docker images ...\n"
-  cd "${container_dir}"
-  docker-compose build
-  docker-compose up -d
-  docker-compose ps
-
-  # Remove init.sql setup file (Delete this file because it contains database user credentials)
-  ###rm "${init_db_file}"
-}
-
 build_create_project_script() {
 
   # ##########################################################################################
@@ -269,7 +602,7 @@ build_create_project_script() {
   # ##########################################################################################
   create_project_script="${container_dir}/create_project.sh"
 
-  printf "\nCreating build project script ${create_project_script} ...\n\n"
+  printf "\nCreating create_project.sh ...\n"
   export DIR=${create_project_script%/*}
   if [ ! -d "${DIR}" ] ; then
     mkdir -p "${DIR}"
@@ -350,43 +683,35 @@ build_create_project_script() {
   sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${create_project_script}"
 }
 
-run_post_install_processes_OLD(){
-  #docker restart "${project_name}-app"
-
-  if [[ $project_framework == "CodeIgniter" ]]; then
-
-    # CodeIgniter
-    if [[ $run_db_migrations == "Y" ]]; then
-      printf "\nRunning database migrations ..."
-      docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
-
-  #    docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-migrate.sh"
-    fi
-    if [[ $run_db_seeds == "Y" ]]; then
-      printf "\nRunning database seeds ..."
-      docker exec -w "${local_container_dir}" "${project_name}-app" bash "/var/www/scripts/codeigniter-db-seed.sh"
-    fi
-
-  elif [[ $project_framework == "Laravel" ]]; then
-
-    # Laravel
-    docker exec -w /var/www/scripts "${project_name}-app" bash laravel-clear_cache.sh
-    docker restart "${project_name}-app"
-    if [[ $run_db_migrations == "Y" ]]; then
-      docker exec -w /var/www/scripts "${project_name}-app" bash laravel-migrate.sh
-    fi
-    if [[ $run_db_seeds == "Y" ]]; then
-      docker exec -w /var/www/scripts "${project_name}-app" bash laravel-db_seed.sh
-    fi
-
-  elif [[ $project_framework == "Lumen" ]]; then
-
-    docker-compose exec app php "${local_container_dir}/artisan" cache:clear
-    if [[ $run_db_migrations == "Y" ]]; then
-      docker-compose exec app php "${local_container_dir}/artisan" migrate
-    fi
-
+prompt_to_build_images() {
+  printf "\nThe Docker configuration files have been built."
+  printf "\nEnter [Q] to quit or [C] to build and launch the Docker images.\n"
+  response=""
+  while [[ "${response^^}" != "C" ]] && [[ "${response^^}" != "Q" ]]; do
+    read response
+  done
+  if [[ "${response^^}" == "Q" ]]; then
+    printf "\n\nTo create the Docker images manually:"
+    printf "\n\tcd ${container_dir}"
+    printf "\n\tdocker-compose build"
+    printf "\n\tdocker-compose up -d"
+    printf "\n\tdocker-compose ps"
+    printf "\n\nThen to create the project run the create_project script: "
+    printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh\n"
+    exit
   fi
+
+}
+
+build_docker_images() {
+  printf "Building Docker images ...\n"
+  cd "${container_dir}"
+  docker-compose build
+  docker-compose up -d
+  docker-compose ps
+
+  # Remove init.sql setup file (Delete this file because it contains database user credentials)
+  ###rm "${init_db_file}"
 }
 
 run_post_install_processes(){
@@ -396,114 +721,9 @@ run_post_install_processes(){
   printf "\n\nRunning post-install process ... "
 }
 
-build_project() {
+run_create_project_script() {
   printf "\n\nBuilding project ....\n"
   docker exec -t "${project_name}-app" bash create_project.sh
-}
-
-get_choice_response() {
-  local __options=("$@")
-
-  i=1
-  for name in "${__options[@]}"; do
-    printf "\n\t${i} - ${name##*/}"
-    i=$((${i} + 1))
-  done
-  printf "\n"
-
-  response=0
-  while [[ response -lt 1 || response -gt "${#__options[@]}" ]]; do
-    read response
-  done
-  response=$((${response} - 1))
-}
-
-get_yes_or_no_response() {
-  local __default=$1
-  valid_yes_no_responses=("Y N")
-  good_reply=false
-  while [ "$good_reply" != true ]; do
-    read response
-    if [[ -z "${response}" ]] && [[ ! -z "${__default}" ]]; then
-      response="${__default}"
-    fi
-    response=${response^^}
-    if [[ " ${valid_yes_no_responses[@]} " =~ " ${response} " ]]; then
-      good_reply=true
-    fi
-  done
-}
-
-set_git_repo() {
-  printf "\nEnter the git repository or leave blank if you are creating a new project."
-  valid_response=false
-  while [[ "${valid_response}" == false ]]; do
-    read response
-    if (git ls-remote "${response}" -q 2>&1); then
-      valid_response=true
-      git_repo="${response}"
-    else
-      printf "\nGit repository does not exist or it is not accessible.\n"
-      valid_response=false
-      git_repo=""
-    fi
-  done
-}
-
-set_php_framework() {
-
-  if [[ -z "${git_repo}" ]]; then
-    printf "\nSelect the PHP framework to install."
-  else
-    printf "\nSelect the PHP framework of the repository."
-    printf "\nThis used to automatically configure the project environment settings."
-    printf "\nIf you do not know the framework or do not want it configured then select '(none)'."
-  fi
-  options=("(none)")
-  for framework in "${php_frameworks[@]}"; do
-    options+=("${framework}")
-  done
-
-  i=1
-  for name in "${options[@]}"; do
-    printf "\n\t${i} - ${name##*/}"
-    i=$((${i} + 1))
-  done
-  printf "\n"
-  valid_response=false
-  while [[ "${valid_response}" == false ]]; do
-    read response
-    re='^[0-9]+$'
-    if [[ -z "${response}" ]]; then
-      valid_response=false
-      selected_index=""
-      php_framework=""
-    elif [[ "$response" -eq 1 ]]; then
-      valid_response=true
-      selected_index=$((${response}))
-      php_framework=""
-    elif [[ "$response" -gt 1 && "$response" -le "${#options[@]}" ]]; then
-      valid_response=true
-      selected_index=$((${response} - 2))
-      php_framework="${php_frameworks[$selected_index]}"
-    else
-      printf "\nSelect a valid number.\n"
-      valid_response=false
-      selected_index=""
-      php_framework=""
-    fi
-  done
-  if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
-    local_web_root="/var/www/site/webroot"
-    web_root="${site_dir}/webroot"
-  elif [[ "${php_framework^^}" == "WORDPRESS" ]]; then
-    site_dir="${container_dir}/wordpress"
-    local_web_root="/var/www/wordpress"
-    web_root="${site_dir}"
-  elif [[ "${php_framework^^}" == "YII2" ]]; then
-    local_web_root="/var/www/site/web"
-    web_root="${site_dir}/web"
-  fi
 }
 
 populate_containers_created_array() {
@@ -580,219 +800,55 @@ display_configuration() {
   printf "\n-----------------------------------------------------------\n"
 }
 
-
 # ##########################################################################################
 # Prompt user for all settings.
 # ##########################################################################################
 
 printf "\nCreating a Docker PHP development environment\n"
 
-# Get the project name
-if [ -z "${project_name}" ]; then
-  printf "\nEnter the project name. (Can only contain letters, numbers, underscores and dashes.)"
-  valid_project_name=false
-  while [ "${valid_project_name}" != true ]; do
-    read  project_name
-    if [[ "${project_name}" =~ ^[A-Za-z0-9_-]+$ ]]; then
-      valid_project_name=true
-    else
-      valid_project_name=false
-    fi
-  done
-fi
-container_dir="${container_base_dir}/${project_name}"
-local_container_dir="/var/www/${project_name}"
-db_name="${project_name//[\-]/_}"
-create_project_script="${container_dir}/create_project.sh"
+# Set the project name
+set_project_name
 
-# Get the container directory
-printf "\nEnter the directory for the container or just hit [Enter]\n"
-printf "to use the directory ${container_base_dir}.\n"
-read custom_base_dir
-custom_base_dir="${custom_base_dir:-${container_base_dir}}"
-container_base_dir="${custom_base_dir}"
-if [ ! -d "${container_base_dir}" ]; then
-  printf "\nThe directory ${container_base_dir} does not exist. Please create it and then rerun this script.\n"
-  exit
-fi
-container_dir="${container_base_dir}/${project_name}"
-if [ -d "${container_dir}" ]; then
-  printf "\nThe directory ${container_dir} already exists. Delete or rename it and then rerun this script.\n"
-  exit
-fi
+# Set the container directory
+set_container_directory
 
-# Get the server service and server version (from the files in the configurations/Dockerfiles directory)
-service_server="NGINX"
-printf "\nSelect ${service_server} version:"
-get_choice_response "${dockerfiles[@]}"
-dockerfile="${dockerfiles[$response]}"
-server_version="${dockerfile##*/}"
+# Set the server service
+set_server_service
 
-# Get the port
-port_is_in_use=true
-select_a_port_prompt="\nSelect a port [${default_port}]: "
-while [[ "${port_is_in_use}" == true ]]; do
-  printf "${select_a_port_prompt}\n"
-  read port
-  port="${port:-${default_port}}"
-  if [[ "$port" -lt 1024 ||"$port" -gt 65535 ]]; then
-    select_a_port_prompt="\nA port must be in the range 1024 to 65535. Select a different port. [${default_port}] "
-  elif [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
-    select_a_port_prompt="\nPort ${port} is in use. Select a different port. [${default_port}] "
-    port_is_in_use=true
-  else
-    port_is_in_use=false
-  fi
-done
-site_url="http://localhost:${port}"
+# Set the port
+set_port
 
-# Set the git respository
+# Set the git repository (or set to empty)
 set_git_repo
 
-# Set PHP framework
+# Set PHP framework (or empty)
 set_php_framework
 
 # Is this a full install?
-if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]]; then
-  printf "\nIs this a full install? [Y]"
-  get_yes_or_no_response "Y"
-  if [[ "${response}" == "Y" ]]; then
-    full_install=true
-  else
-    full_response=false
-  fi
-fi
+is_this_a_full_install
 
-# Should we create a MailHog container?
-printf "\nCreate a MailHog container? [N]\n"
-get_yes_or_no_response "N"
-if [[ "${response}" == "Y" ]]; then
-  service_email="MailHog"
-else
-  service_email=""
-fi
+# Should we create a MailHog service?
+set_mailhog_service
 
 # Get the database service
-printf "\nSelect the database:"
-get_choice_response "${db_services[@]}"
-service_db="${db_services[$response]}"
+set_database_service
 
-#@TODO: Allow the user to specify the database name
+# Configure database
+configure_database
 
-# Get database ports
-if [[ "${service_db}^^" == "MYSQL" ]] || [[ "${service_db}^^" == "MARIADB" ]]; then
-  db_port=3306
-  db_exposed_port=6603
-elif [[ "${service_db}^^" == "POSTGRES" ]]; then
-  db_port=5432
-  db_exposed_port=5432
-fi
-while [[ $(nc -w5 -z -v localhost "${db_exposed_port}" 2>&1) == *"succeeded"* ]]; do
-  db_exposed_port=$((${db_exposed_port} + 1))
-done
+# Should we run database migrations and seeds?
+run_database_migrations
+run_database_seeds
 
-# Should we include a database admin service
-if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
-  service_db_admin="phpMyAdmin"
-elif [[ "${service_db^^}" == "POSTGRES" ]]; then
-  service_db_admin="pgAdmin"
-else
-  service_db_admin=""
-fi
-if [[ ! -z "${service_db_admin}" ]]; then
-  printf "\nCreate a container for ${service_db_admin}? [Y]\n"
-  get_yes_or_no_response "Y"
-  if [[ "${response}" == "N" ]]; then
-    service_db_admin=""
-  fi
-fi
-if [[ ! -z "${service_db_admin}" ]]; then
-  db_admin_port=$(($port + 1))
-  while [[ $(nc -w5 -z -v localhost "${db_admin_port}" 2>&1) == *"succeeded"* ]]; do
-    db_admin_port=$((db_admin_port + 1))
-  done
-fi
-db_admin_url="http://localhost:${db_admin_port}"
+# Should we create a database admin service?
+set_database_admin_service
 
-# Get database root password
-printf "\nEnter database root password.\n"
-db_root_password=
-while [ -z "$db_root_password" ]; do
-  read db_root_password
-done
+# Should we create a phpinfo.php file?
+set_phpinfo_file
 
-# Get database username
-db_username=
-valid_username=false
-printf "\nEnter database username.\n"
-while [ "$valid_username" = false ]; do
-  read db_username
-  if [ -z "$db_username" ]; then
-    valid_username=false
-  elif [[ ! ($db_username =~ ^[A-Za-z0-9_-]+$) ]]; then
-  printf "User name can only contain alphanumeric characters, underscores and dashes.\n"
-    valid_username=false
-  elif [[ $(expr length "$db_username") -gt 20 ]]; then
-    printf "User name can be no longer than 20 characters.\n"
-    valid_username=false
-  else
-    valid_username=true
-  fi
-done
-
-# Get database user password
-printf "\nEnter database user password.\n"
-db_password=
-while [ -z "$db_password" ]; do
-  read db_password
-done
-
-# Should we run database migrations?
-if [[ "${frameworks_with_db_migrations[@]}" =~ "${php_framework}" ]]; then
-  printf "\nRun database migrations? [Y]\n"
-  get_yes_or_no_response "Y"
-  if [[ "${response}" == "Y" ]]; then
-    run_db_migrations=true
-  else
-    run_db_migrations=false
-  fi
-fi
-
-# Should we run database seeders?
-if [[ "${frameworks_with_db_seeds[@]}" =~ "${php_framework}" ]]; then
-  printf "\nRun database seeds? [Y]\n"
-  get_yes_or_no_response "Y"
-  if [[ "${response}" == "Y" ]]; then
-    run_db_seeds=true
-  else
-    run_db_seeds=false
-  fi
-fi
-
-# Should we create a phpinfo.php file
-printf "\nCreate a http://localhost:${port}/phpinfo.php file? [Y]\n"
-get_yes_or_no_response "Y"
-if [[ "${response}" == "Y" ]]; then
-  create_phpinfo_file=true
-else
-  create_phpinfo_file=false
-fi
-
-
-# ##########################################################################################
-# Confirm settings before continuing.
-# ##########################################################################################
-
+# Confirm settings before continuing
 display_configuration
-printf "\nEnter [C] to continue or [Q] to quit.\n"
-response=""
-while [[ "${response^^}" != "C" ]] && [[ "${response^^}" != "Q" ]]; do
-  read response
-done
-if [[ "${response^^}" == "Q" ]]; then
-  printf "\n"
-  exit
-fi
+continue_confirmation
 
 # Define the docker files
 define_docker_files
@@ -803,16 +859,20 @@ create_server_conf_file
 create_db_init_file
 build_create_project_script
 
+# Allow the user to exit before building the images
+prompt_to_build_images
+
 # Build the docker images
 build_docker_images
 
 # Run post-install process
 run_post_install_processes
 
+# Create an array of all of the containers that have been created
 populate_containers_created_array
 
-printf "\n\nBuilding project ....\n"
-docker exec -t "${project_name}-app" bash create_project.sh
+# Build the PHP project
+run_create_project_script
 
 script_completed=true
 
@@ -845,7 +905,6 @@ printf "\n\tdocker exec -it ${project_name}-app bash"
 printf "\n\nTo destroy all Docker containers that were created:"
 printf "\n\tbash destroy.sh ${project_name}\n"
 
-printf "\n===>${php_framework}<=====>${git_rep}<====\n\n"
 if [[ -z "${php_framework}" ]] && [[ -z "${git_rep}" ]]; then
   printf "\nCreate your project in the ${project_name}-app container in the directory /www/var/${project_name}.\n\n"
 fi

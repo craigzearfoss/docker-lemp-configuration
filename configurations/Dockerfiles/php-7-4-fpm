@@ -48,8 +48,7 @@ RUN useradd -G www-data,root -u $uid -d /home/$user $user
 RUN mkdir -p /home/$user/.composer && \
     chown -R $user:$user /home/$user
 
-#ADD /scripts /scripts
-#RUN chmod +x /scripts/*
+# SECTION:node
 
 # Copy the script that builds the project
 COPY /create_project.sh /var/www/create_project.sh
@@ -58,5 +57,5 @@ RUN chmod +x /var/www/create_project.sh
 # Set working directory
 WORKDIR /var/www
 
-USER $user
+#USER $user
 
