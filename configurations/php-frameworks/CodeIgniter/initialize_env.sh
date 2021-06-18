@@ -19,7 +19,7 @@ service_db="{{service_db}}"
 web_root="{{web_root}}"
 
 # Make sure .env file exists
-if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/.env.example" ]]; then
+if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
 
   cp /var/www/site/env "${env_file}"
 

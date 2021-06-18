@@ -194,6 +194,62 @@ create_db_init_file() {
   fi
 }
 
+initialize_cakephp_project() {
+  printf ""
+}
+
+initialize_codeigniter_project() {
+  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/initialize_env.sh" >> "${create_project_script}"
+  #if [[ $run_db_migrations == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/migrate.sh" >> "${create_project_script}"
+  #fi
+  #if [[ $run_db_seeds == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/seed.sh" >> "${create_project_script}"
+  #fi
+}
+
+initialize_fuelphp_project() {
+  printf ""
+}
+
+initialize_laminas_project() {
+  printf ""
+}
+
+initialize_laravel_project() {
+  cat "${working_dir}/configurations/php-frameworks/Laravel/initialize_env.sh" >> "${create_project_script}"
+  #if [[ $run_db_migrations == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
+  #fi
+  #if [[ $run_db_seeds == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
+  #fi
+}
+
+initialize_lumen_project() {
+  printf ""
+}
+
+initialize_phalcon_project() {
+  printf ""
+}
+
+initialize_slim_project() {
+  printf ""
+}
+
+initialize_symfony_project() {
+  printf ""
+}
+
+initialize_wordpress_project() {
+  printf ""
+}
+
+initialize_yii2_project() {
+  printf ""
+}
+
 build_docker_images() {
   printf "Building Docker images ...\n"
   cd "${container_dir}"
@@ -294,62 +350,6 @@ build_create_project_script() {
   sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${create_project_script}"
 }
 
-initialize_cakephp_project() {
-  printf ""
-}
-
-initialize_codeigniter_project() {
-  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/initialize_env.sh" >> "${create_project_script}"
-  #if [[ $run_db_migrations == true ]]; then
-  #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/migrate.sh" >> "${create_project_script}"
-  #fi
-  #if [[ $run_db_seeds == true ]]; then
-  #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/seed.sh" >> "${create_project_script}"
-  #fi
-}
-
-initialize_fuelphp_project() {
-  printf ""
-}
-
-initialize_laminas_project() {
-  printf ""
-}
-
-initialize_laravel_project() {
-  cat "${working_dir}/configurations/php-frameworks/Laravel/initialize_env.sh" >> "${create_project_script}"
-  #if [[ $run_db_migrations == true ]]; then
-  #  cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
-  #fi
-  #if [[ $run_db_seeds == true ]]; then
-  #  cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
-  #fi
-}
-
-initialize_lumen_project() {
-  printf ""
-}
-
-initialize_phalcon_project() {
-  printf ""
-}
-
-initialize_slim_project() {
-  printf ""
-}
-
-initialize_symfony_project() {
-  printf ""
-}
-
-initialize_wordpress_project() {
-  printf ""
-}
-
-initialize_yii2_project() {
-  printf ""
-}
-
 run_post_install_processes_OLD(){
   #docker restart "${project_name}-app"
 
@@ -434,8 +434,31 @@ get_yes_or_no_response() {
   done
 }
 
-set_php_framework_or_git_repo() {
-  printf "\nEnter the git repository or select a PHP framework from the following list."
+set_git_repo() {
+  printf "\nEnter the git repository or leave blank if you are creating a new project."
+  valid_response=false
+  while [[ "${valid_response}" == false ]]; do
+    read response
+    if (git ls-remote "${response}" -q 2>&1); then
+      valid_response=true
+      git_repo="${response}"
+    else
+      printf "\nGit repository does not exist or it is not accessible.\n"
+      valid_response=false
+      git_repo=""
+    fi
+  done
+}
+
+set_php_framework() {
+
+  if [[ -z "${git_repo}" ]]; then
+    printf "\nSelect the PHP framework to install."
+  else
+    printf "\nSelect the PHP framework of the repository."
+    printf "\nThis used to automatically configure the project environment settings."
+    printf "\nIf you do not know the framework or do not want it configured then select '(none)'."
+  fi
   options=("(none)")
   for framework in "${php_frameworks[@]}"; do
     options+=("${framework}")
@@ -455,38 +478,19 @@ set_php_framework_or_git_repo() {
       valid_response=false
       selected_index=""
       php_framework=""
-      git_repo=""
-    elif ! [[ "${response/-/}" =~ $re ]]; then
-      # Not a number (Assume a git repository)
-      if (git ls-remote "${response}" -q 2>&1); then
-        valid_response=true
-        selected_index=""
-        php_framework=""
-        git_repo="${response}"
-      else
-        printf "\nGit repository does not exist or it is not accessible.\n"
-        printf "\nSelect a number or enter a valid git repository.\n"
-        valid_response=false
-        selected_index=""
-        php_framework=""
-        git_repo=""
-      fi
     elif [[ "$response" -eq 1 ]]; then
       valid_response=true
       selected_index=$((${response}))
       php_framework=""
-      git_repo=""
     elif [[ "$response" -gt 1 && "$response" -le "${#options[@]}" ]]; then
       valid_response=true
       selected_index=$((${response} - 2))
       php_framework="${php_frameworks[$selected_index]}"
-      git_repo=""
     else
-      printf "\nSelect a valid number or enter a git repository.\n"
+      printf "\nSelect a valid number.\n"
       valid_response=false
       selected_index=""
       php_framework=""
-      git_repo=""
     fi
   done
   if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
@@ -642,8 +646,11 @@ while [[ "${port_is_in_use}" == true ]]; do
 done
 site_url="http://localhost:${port}"
 
-# Set PHP framework (or git repository)
-set_php_framework_or_git_repo
+# Set the git respository
+set_git_repo
+
+# Set PHP framework
+set_php_framework
 
 # Is this a full install?
 if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]]; then
@@ -786,10 +793,6 @@ if [[ "${response^^}" == "Q" ]]; then
   printf "\n"
   exit
 fi
-
-# Create the project code
-#create_project_code
-# Create the bootstrap.sh file
 
 # Define the docker files
 define_docker_files
