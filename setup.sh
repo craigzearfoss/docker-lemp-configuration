@@ -837,7 +837,7 @@ if [[ "${create_phpinfo_file}" == true ]]; then
 fi
 
 printf "\n\nTo access the Docker container:"
-printf "\n\tdocker exect -it ${project_name}-app bash"
+printf "\n\tdocker exec -it ${project_name}-app bash"
 
 printf "\n\nTo destroy all Docker containers that were created:"
 printf "\n\tbash destroy.sh ${project_name}\n"
