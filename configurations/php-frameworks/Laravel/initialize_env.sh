@@ -28,7 +28,6 @@ if [[ -f "$env_file" ]]; then
   # Make modifications to .env file
   echo "Modifying .env file ..."
   sed -i "s/APP_NAME=.*/APP_NAME=${project_name}/g" "${env_file}"
-#APP_KEY=base64:rL9TZ1d9oW7tLXYJ+fXD2gR7xOTculoZn/2oCqSmVfI=
   sed -i "s/APP_ENV=.*/APP_ENV=local/g" "${env_file}"
   sed -i "s/DEBUG=.*/DEBUG=true/g" "${env_file}"
   sed -i "s/APP_URL=.*/APP_URL=http:\/\/localhost:${port}/g" "${env_file}"
