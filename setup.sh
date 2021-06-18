@@ -300,12 +300,12 @@ initialize_cakephp_project() {
 
 initialize_codeigniter_project() {
   cat "${working_dir}/configurations/php-frameworks/CodeIgniter/initialize_env.sh" >> "${create_project_script}"
-  if [[ $run_db_migrations == true ]]; then
-    cat "${working_dir}/configurations/php-frameworks/CodeIgniter/migrate.sh" >> "${create_project_script}"
-  fi
-  if [[ $run_db_seeds == true ]]; then
-    cat "${working_dir}/configurations/php-frameworks/CodeIgniter/seed.sh" >> "${create_project_script}"
-  fi
+  #if [[ $run_db_migrations == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/migrate.sh" >> "${create_project_script}"
+  #fi
+  #if [[ $run_db_seeds == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/seed.sh" >> "${create_project_script}"
+  #fi
 }
 
 initialize_fuelphp_project() {
@@ -318,12 +318,12 @@ initialize_laminas_project() {
 
 initialize_laravel_project() {
   cat "${working_dir}/configurations/php-frameworks/Laravel/initialize_env.sh" >> "${create_project_script}"
-  if [[ $run_db_migrations == true ]]; then
-    cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
-  fi
-  if [[ $run_db_seeds == true ]]; then
-    cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
-  fi
+  #if [[ $run_db_migrations == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
+  #fi
+  #if [[ $run_db_seeds == true ]]; then
+  #  cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
+  #fi
 }
 
 initialize_lumen_project() {
