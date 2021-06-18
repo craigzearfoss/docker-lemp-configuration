@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Add development-only files to .gitignore file
-echo "\nAdding development-only files to .gitignore file ..."
-gitignore_file=/var/www/site/.gitignore
+echo "Adding development-only files to .gitignore file ..."
+gitignore_file="/var/www/site/.gitignore"
 
 if [ -d "${gitignore_file}" ]; then
   touch "${gitignore_file}"

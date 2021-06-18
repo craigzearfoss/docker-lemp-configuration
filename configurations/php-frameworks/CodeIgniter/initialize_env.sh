@@ -19,7 +19,7 @@ service_db="{{service_db}}"
 web_root="{{web_root}}"
 
 # Make sure .env file exists
-if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
+if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/.env.example" ]]; then
 
   cp /var/www/site/env "${env_file}"
 
@@ -49,7 +49,7 @@ if [[ -f "$env_file" ]]; then
   # Make modifications to .env file
   echo "Modifying .env file ..."
   sed -i "s/.*CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" "${env_file}"
-  sed -i "s/.*database.default.hostname =.*/database.default.hostname = db-${service_db}/g" "${env_file}"
+  sed -i "s/.*database.default.hostname =.*/database.default.hostname = db-${service_db,,}/g" "${env_file}"
   sed -i "s/.*database.default.database =.*/database.default.database = ${db_name}/g" "${env_file}"
   sed -i "s/.*database.default.username =.*/database.default.username = ${db_username}/g" "${env_file}"
   sed -i "s/.*database.default.password =.*/database.default.password = '${db_password}'/g" "${env_file}"

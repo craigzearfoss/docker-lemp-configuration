@@ -283,6 +283,7 @@ build_create_project_script() {
   sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${create_project_script}"
   sed -i "s/{{db_name}}/${db_name}/g" "${create_project_script}"
   sed -i "s/{{db_password}}/${db_password}/g" "${create_project_script}"
+  sed -i "s/{{db_port}}/${db_port}/g" "${create_project_script}"
   sed -i "s/{{db_username}}/${db_username}/g" "${create_project_script}"
   sed -i "s/{{full_install}}/true/g" "${create_project_script}"
   sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${create_project_script}"
@@ -316,12 +317,12 @@ initialize_laminas_project() {
 }
 
 initialize_laravel_project() {
-  cat "${working_dir}/configurations/scripts/laravel-initialize_env.sh" >> "${create_project_script}"
+  cat "${working_dir}/configurations/php-frameworks/Laravel/initialize_env.sh" >> "${create_project_script}"
   if [[ $run_db_migrations == true ]]; then
-    cat "${working_dir}/configurations/scripts/laravel-migrate.sh" >> "${create_project_script}"
+    cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
   fi
   if [[ $run_db_seeds == true ]]; then
-    cat "${working_dir}/configurations/scripts/laravel-seed.sh" >> "${create_project_script}"
+    cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
   fi
 }
 
