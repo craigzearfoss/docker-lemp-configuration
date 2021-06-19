@@ -9,13 +9,13 @@ service_server=""   # NGINX
 service_db=""       # MySQL / MariaDB / Postgres
 service_db_admin="" # phpMyAdmin or pgAdmin
 service_email=""    # MailHog"
-server_version=""   # name of the docker file in the configurations/Dockerfiles directory
+php_version=""      # name of the docker file in the configurations/Dockerfiles directory
 containers_created=()
 
 create_app_service=true
 
-node_version=""
-node_versions=("12.6.0")
+nodejs_version=""
+nodejs_versions=("16.3.0" "14.17.1" "12.22.1")
 project_name=$1
 php_framework=""
 git_repo=""
@@ -61,6 +61,8 @@ db_admin_url="http://localhost:${db_admin_port}"
 create_phpinfo_file="N"
 create_project_script="create_project_script"
 
+empty_option_choice_is_valid=false
+
 get_choice_response() {
   local __options=("$@")
 
@@ -74,8 +76,12 @@ get_choice_response() {
   response=0
   while [[ response -lt 1 || response -gt "${#__options[@]}" ]]; do
     read response
+    if [ -z "${response}" ]; then
+      break
+    fi
   done
   response=$((${response} - 1))
+  empty_option_choice_is_valid=false;
 }
 
 get_yes_or_no_response() {
@@ -110,6 +116,24 @@ join_by() {
   local IFS="$1";
   shift;
   echo "$*";
+}
+
+replace_variables_in_file() {
+  local __file_to_process=$1
+  sed -i "s/{{db_admin_port}}/${db_admin_port}/g" "${__file_to_process}"
+  sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${__file_to_process}"
+  sed -i "s/{{db_name}}/${db_name}/g" "${__file_to_process}"
+  sed -i "s/{{db_password}}/${db_password}/g" "${__file_to_process}"
+  sed -i "s/{{db_port}}/${db_port}/g" "${__file_to_process}"
+  sed -i "s/{{db_username}}/${db_username}/g" "${__file_to_process}"
+  sed -i "s/{{full_install}}/true/g" "${__file_to_process}"
+  sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${__file_to_process}"
+  sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${__file_to_process}"
+  sed -i "s/{{nodejs_version}}/${nodejs_version}/g" "${__file_to_process}"
+  sed -i "s/{{port}}/${port}/g" "${__file_to_process}"
+  sed -i "s/{{project_name}}/${project_name}/g" "${__file_to_process}"
+  sed -i "s/{{service_db}}/${service_db}/g" "${__file_to_process}"
+  sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${__file_to_process}"
 }
 
 set_project_name() {
@@ -150,10 +174,16 @@ set_container_directory() {
 
 set_server_service() {
   service_server="NGINX"
-  printf "\nSelect ${service_server} version:"
+  printf "\nSelect ${service_server} version: [3]"
+  empty_option_choice_is_valid=true
   get_choice_response "${dockerfiles[@]}"
-  dockerfile="${dockerfiles[$response]}"
-  server_version="${dockerfile##*/}"
+  if [ "${response}" -eq -1 ]; then
+    src_dockerfile="${dockerfiles[2]}"
+    php_version="${src_dockerfile##*/}"
+  else
+    src_dockerfile="${dockerfiles[$response]}"
+    php_version="${src_dockerfile##*/}"
+  fi
 }
 
 set_port() {
@@ -218,7 +248,6 @@ set_php_framework() {
   valid_response=false
   while [[ "${valid_response}" == false ]]; do
     read response
-    re='^[0-9]+$'
     if [[ -z "${response}" ]]; then
       valid_response=false
       selected_index=""
@@ -291,9 +320,14 @@ set_database_name() {
 }
 
 set_database_service() {
-  printf "\nSelect the database:"
+  printf "\nSelect the database: [1]"
+  empty_option_choice_is_valid=true
   get_choice_response "${db_services[@]}"
-  service_db="${db_services[$response]}"
+  if [ "${response}" -eq -1 ]; then
+    service_db="MySQL"
+  else
+    service_db="${db_services[$response]}"
+  fi
 
   set_database_name
 
@@ -332,6 +366,52 @@ set_database_admin_service() {
     done
   fi
   db_admin_url="http://localhost:${db_admin_port}"
+}
+
+set_nodejs_version() {
+  printf "\nInstall Node.js? [Y]\n"
+  get_yes_or_no_response "Y"
+  if [[ "${response}" == "Y" ]]; then
+    printf "\nSelect the Node.js version. [1]"
+    i=1
+    for version in "${nodejs_versions[@]}"; do
+      printf "\n\t${i} - ${version##*/}"
+      i=$((${i} + 1))
+    done
+    printf "\n"
+    valid_response=false
+    while [[ "${valid_response}" == false ]]; do
+      read response
+      re='^[0-9]+$'
+      if [[ -z "${response}" ]]; then
+        valid_response=true
+        nodejs_version="${nodejs_versions[0]}"
+      else
+        res="${response//[^\.]}"
+        dot_count="${#res}"
+        if [[ "$dot_count" -eq 0 ]]; then
+          if [[ "$response" -gt 0 && "$response" -le "${#nodejs_versions[@]}" ]]; then
+            valid_response=true
+            selected_index=$((${response} - 1))
+            nodejs_version="${nodejs_versions[$selected_index]}"
+          else
+            valid_response=false
+            printf "\nInvalid selection or Node.js version.\n"
+          fi
+        else
+          if [ "${#res}" -eq 2 ]; then
+            valid_response=true
+            nodejs_version="${response}"
+          else
+            valid_response=false
+            printf "\nInvalid Node.js version.\n"
+          fi
+        fi
+      fi
+    done
+  else
+    nodejs_version=""
+  fi
 }
 
 configure_database() {
@@ -408,7 +488,7 @@ define_docker_files() {
   # Define docker files.
   # ##########################################################################################
 
-  docker_file="${container_dir}/Dockerfile"
+  dockerfile="${container_dir}/Dockerfile"
   docker_compose_file="${container_dir}/docker-compose.yml"
   server_conf_file="${container_dir}/conf-files/${service_server,,}.conf"
   if [[ "${service_db^^}" == "MARIADB" ]] || [[ "${service_db^^}" == "MYSQL" ]]; then
@@ -417,6 +497,13 @@ define_docker_files() {
     init_db_file="${container_dir}/init-files/${service_db,,}/initdb.sh"
   else
     init_db_file=""
+  fi
+}
+
+add_nodejs_to_dockerfile() {
+  if [[ ! -z "${nodejs_version}" ]]; then
+    nodejs_run_code_file="${container_dir}/configurations/Dockerfile-sections/nodejs"
+    sed -i -e "/# SECTION:nodejs/{r ${nodejs_run_code_file}" -e 'd}' ${dockerfile}
   fi
 }
 
@@ -431,7 +518,10 @@ create_docker_files() {
   cp -pr "${working_dir}/configurations/" "${container_dir}/configurations"
 
   printf "\nCopying Dockerfile ..."
-  cp "${working_dir}/configurations/Dockerfiles/${server_version}" "${docker_file}"
+  cp "${src_dockerfile}" "${dockerfile}"
+  printf "\nUpdating Dockerfile ..."
+  add_nodejs_to_dockerfile
+  replace_variables_in_file "${dockerfile}"
 
   # Create docker-compose.yml file
   printf "\nCreating docker-compose.yml ..."
@@ -463,11 +553,7 @@ create_docker_files() {
 
   # Make modifications to docker-compose.yml file.
   printf "\nUpdating docker-compose.yml ..."
-  sed -i "s/{{project_name}}/${project_name}/g" ${docker_compose_file}
-  sed -i "s/{{port}}/${port}/g" ${docker_compose_file}
-  sed -i "s/{{service_db}}/${service_db,,}/g" ${docker_compose_file}
-  sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" ${docker_compose_file}
-  sed -i "s/{{db_admin_port}}/${db_admin_port}/g" ${docker_compose_file}
+  replace_variables_in_file "${docker_compose_file}"
 }
 
 create_server_conf_file() {
@@ -668,19 +754,7 @@ build_create_project_script() {
   chmod +x "${create_project_script}"
   sed -i "s/#!\/bin\/bash.*//g" "${create_project_script}"
   sed -i '1s/^/#!\/bin\/bash\n/' "${create_project_script}"
-  sed -i "s/{{db_admin_port}}/${db_admin_port}/g" "${create_project_script}"
-  sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${create_project_script}"
-  sed -i "s/{{db_name}}/${db_name}/g" "${create_project_script}"
-  sed -i "s/{{db_password}}/${db_password}/g" "${create_project_script}"
-  sed -i "s/{{db_port}}/${db_port}/g" "${create_project_script}"
-  sed -i "s/{{db_username}}/${db_username}/g" "${create_project_script}"
-  sed -i "s/{{full_install}}/true/g" "${create_project_script}"
-  sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${create_project_script}"
-  sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${create_project_script}"
-  sed -i "s/{{port}}/${port}/g" "${create_project_script}"
-  sed -i "s/{{project_name}}/${project_name}/g" "${create_project_script}"
-  sed -i "s/{{service_db}}/${service_db}/g" "${create_project_script}"
-  sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${create_project_script}"
+  replace_variables_in_file "${create_project_script}"
 }
 
 prompt_to_build_images() {
@@ -765,10 +839,6 @@ display_configuration() {
     printf "\nPHP Information:          ${site_url}/phpinfo.php"
   fi
   printf "\nDocker version:           ${docker_version}"
-  printf "\nPHP framework:            ${php_framework}"
-  if [[ "${php_framework}" == "Symfony" ]] && [[ "${full_install}" == false ]]; then
-    printf " (Partial install)"
-  fi
   printf "\nWorking directory:        ${working_dir}"
   printf "\nContainer base dir:       ${container_base_dir}"
   printf "\nContainer directory:      ${container_dir}"
@@ -776,6 +846,16 @@ display_configuration() {
   printf "\nWeb root:                 ${web_root}"
   printf "\nGit repository:           ${git_repo}"
   printf "\nPort:                     ${port}"
+  printf "\nPHP version:              ${php_version}"
+  printf "\nPHP framework:            ${php_framework}"
+  if [[ "${php_framework}" == "Symfony" ]] && [[ "${full_install}" == false ]]; then
+    printf " (Partial install)"
+  fi
+  if [ ! -z "${nodejs_version}" ]; then
+    printf "\nNode.js version:          ${nodejs_version}"
+  else
+    printf "\nNode.js version:          [not installed]"
+  fi
   printf "\nDatabase:"
   printf "\n    Type:                 ${service_db}"
   printf "\n    Host/Server:          db-${service_db,,}"
@@ -826,6 +906,9 @@ set_php_framework
 
 # Is this a full install?
 is_this_a_full_install
+
+# Should we install node.js?
+set_nodejs_version
 
 # Should we create a MailHog service?
 set_mailhog_service
