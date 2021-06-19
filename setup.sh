@@ -5,11 +5,11 @@ script_completed=false
 
 working_dir="$(pwd)"
 
-service_server=""   # NGINX
-service_db=""       # MySQL / MariaDB / Postgres
-service_db_admin="" # phpMyAdmin or pgAdmin
-service_email=""    # MailHog"
-php_version=""      # name of the docker file in the configurations/Dockerfiles directory
+service_server="NGINX" # NGINX
+service_db="MySQL"     # MySQL / MariaDB / Postgres
+service_db_admin=""    # phpMyAdmin or pgAdmin
+service_email=""       # MailHog"
+php_version=""         # name of the docker file in the configurations/Dockerfiles directory
 containers_created=()
 
 create_app_service=true
@@ -28,7 +28,8 @@ local_container_dir="/var/www/${project_name}"
 create_project_script="${container_dir}/create_project.sh"
 port=
 default_port=8000
-dockerfiles=("${working_dir}"/configurations/Dockerfiles/*)
+servers=("${working_dir}"/configurations/Dockerfiles/*)
+dockerfiles=("${working_dir}"/configurations/Dockerfiles/${service_server}/*)
 db_name=${project_name//[\-]/_}
 db_root_password=
 db_username=
@@ -132,7 +133,9 @@ replace_variables_in_file() {
   sed -i "s/{{nodejs_version}}/${nodejs_version}/g" "${__file_to_process}"
   sed -i "s/{{port}}/${port}/g" "${__file_to_process}"
   sed -i "s/{{project_name}}/${project_name}/g" "${__file_to_process}"
-  sed -i "s/{{service_db}}/${service_db}/g" "${__file_to_process}"
+  sed -i "s/{{service_db}}/${service_db,,}/g" "${__file_to_process}"
+  sed -i "s/{{service_db_admin}}/${service_db_admin,,}/g" "${__file_to_process}"
+  sed -i "s/{{service_server}}/${service_server,,}/g" "${__file_to_process}"
   sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${__file_to_process}"
 }
 
@@ -174,7 +177,20 @@ set_container_directory() {
 
 set_server_service() {
   service_server="NGINX"
-  printf "\nSelect ${service_server} version: [3]"
+  printf "\nSelect ${service_server} version: [2]"
+  empty_option_choice_is_valid=true
+  get_choice_response "${servers[@]}"
+  if [ "${response}" -eq -1 ]; then
+    service_server="NGINX"
+  else
+    service_server="${servers[$response]##*/}"
+  fi
+  dockerfiles=("${working_dir}"/configurations/Dockerfiles/${service_server}/*)
+}
+
+set_php_version() {
+  # @TODO: let's reverse the order so newest versions are at the top
+  printf "\nSelect PHP version: [3]"
   empty_option_choice_is_valid=true
   get_choice_response "${dockerfiles[@]}"
   if [ "${response}" -eq -1 ]; then
@@ -846,6 +862,7 @@ display_configuration() {
   printf "\nWeb root:                 ${web_root}"
   printf "\nGit repository:           ${git_repo}"
   printf "\nPort:                     ${port}"
+  printf "\nServer:                   ${service_server}"
   printf "\nPHP version:              ${php_version}"
   printf "\nPHP framework:            ${php_framework}"
   if [[ "${php_framework}" == "Symfony" ]] && [[ "${full_install}" == false ]]; then
@@ -892,16 +909,19 @@ set_project_name
 # Set the container directory
 set_container_directory
 
-# Set the server service
+# Set the server (NGINX / Apache)
 set_server_service
+
+# Set the PHP version
+set_php_version
 
 # Set the port
 set_port
 
-# Set the git repository (or set to empty)
+# Set the git repository or to empty
 set_git_repo
 
-# Set PHP framework (or empty)
+# Set PHP framework or empty
 set_php_framework
 
 # Is this a full install?
