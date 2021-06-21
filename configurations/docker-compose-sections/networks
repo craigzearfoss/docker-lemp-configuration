@@ -1,3 +1,4 @@
 networks:
   {{project_name}}:
     driver: bridge
+

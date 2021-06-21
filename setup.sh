@@ -40,6 +40,7 @@ db_password=
 db_port=3306
 db_exposed_port=6603
 dd_admin_port=$((${dd_admin_port} + 1))
+db_host_data_dir=""
 pgadmin_default_email="admin@admin.com"
 pgadmin_default_password="root"
 
@@ -385,10 +386,10 @@ set_database_service() {
   set_database_name
 
   # Get database ports
-  if [[ "${service_db}^^" == "MYSQL" ]] || [[ "${service_db}^^" == "MARIADB" ]]; then
+  if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
     db_port=3306
     db_exposed_port=6603
-  elif [[ "${service_db}^^" == "POSTGRES" ]]; then
+  elif [[ "${service_db^^}" == "POSTGRES" ]]; then
     db_port=5432
     db_exposed_port=5432
   fi
@@ -401,7 +402,7 @@ set_database_admin_service() {
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
     service_db_admin="phpMyAdmin"
   elif [[ "${service_db^^}" == "POSTGRES" ]]; then
-    service_db_admin="pgAdmin4"
+    service_db_admin="pgAdmin"
   else
     service_db_admin=""
   fi
@@ -410,10 +411,10 @@ set_database_admin_service() {
     get_yes_or_no_response "Y"
     if [[ "${response}" == "N" ]]; then
       service_db_admin=""
-    elif [[ "${service_db_admin^^}" == "PGADMIN4" ]]; then
+    elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
 
       # Get pgAdmin default email
-      printf "\nEnter the email address used to log into pgAdmin4: [${pgadmin_default_email}]\n"
+      printf "\nEnter the email address used to log into pgAdmin: [${pgadmin_default_email}]\n"
       valid_email=false
       while [[ "${valid_email}" == false ]]; do
         read entered_email
@@ -537,12 +538,25 @@ configure_database() {
   while [ -z "${db_password}" ]; do
     read db_password
   done
+
+  printf "\nDo you want to use a directory on the host machine to store"
+  printf "\ndata so it will be persisted if the container is destroyed? [N]\n"
+  get_yes_or_no_response "N"
+  if [[ "${response}" == "Y" ]]; then
+    printf "\nEnter the full path the the storage directory:\n"
+    while [[ -z "${db_host_data_dir}" ]]; do
+      read db_host_data_dir
+      if [ ! -d "${db_host_data_dir}" ]; then
+        printf "\nThe directory ${db_host_data_dir} does not exist so it will be created.\n"
+      fi
+    done
+  fi
 }
 
 run_database_migrations() {
   if [[ "${frameworks_with_db_migrations[@]}" =~ "${php_framework}" ]]; then
-    printf "\nRun database migrations? [Y]\n"
-    get_yes_or_no_response "Y"
+    printf "\nRun database migrations? [N]\n"
+    get_yes_or_no_response "N"
     if [[ "${response}" == "Y" ]]; then
       run_db_migrations=true
     else
@@ -553,8 +567,8 @@ run_database_migrations() {
 
 run_database_seeds() {
   if [[ "${frameworks_with_db_seeds[@]}" =~ "${php_framework}" ]]; then
-    printf "\nRun database seeds? [Y]\n"
-    get_yes_or_no_response "Y"
+    printf "\nRun database seeds? [N]\n"
+    get_yes_or_no_response "N"
     if [[ "${response}" == "Y" ]]; then
       run_db_seeds=true
     else
@@ -631,7 +645,7 @@ create_docker_files() {
   fi
 
   if [[ ! -z ${db_email} ]]; then
-    cat "${working_dir}/configurations/docker-compose-sections/service-${db_email},," >> "${docker_compose_file}"
+    cat "${working_dir}/configurations/docker-compose-sections/service-${db_email,,}" >> "${docker_compose_file}"
   fi;
 
   if [[ ! -z "${service_server}" ]]; then
@@ -644,6 +658,16 @@ create_docker_files() {
   # Make modifications to docker-compose.yml file.
   printf "\nUpdating docker-compose.yml ..."
   replace_variables_in_file "${docker_compose_file}"
+
+  # Are we storing database data in a directory on the host machine?
+  if [[ ! -z "${db_host_data_dir}" ]]; then
+    echo "\nSetting ${service_db,,} data directory to ${db_host_data_dir} on host machine ..."
+    if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
+      sed -i "s/# - \.\/data\/db:.*/- ${db_host_data_dir//\//\\/}:\/var\/lib\/${service_db,,}/" "${docker_compose_file}"
+    elif [[ "${service_db^^}" == "POSTGRES" ]]; then
+      sed -i "s/# - \.\/data\/db:.*/- ${db_host_data_dir//\//\\/}:\/var\/lib\/postgresql/data/" "${docker_compose_file}"
+    fi
+  fi
 }
 
 create_server_conf_file() {
@@ -951,7 +975,7 @@ display_configuration() {
   if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
     printf "\nphpMyAdmin URL:           ${db_admin_url}"
   elif [[ "${service_db_admin^^}" == "PGMYADMIN4" ]]; then
-    printf "\npgAdmin4 URL :            ${db_admin_url}"
+    printf "\npgAdmin URL :             ${db_admin_url}"
   fi
   if [[ "${create_phpinfo_file}" == true ]]; then
     printf "\nPHP Information:          ${site_url}/phpinfo.php"
@@ -993,8 +1017,13 @@ display_configuration() {
     if [[ "${run_db_seeds}" == true ]]; then
       printf "\n    Run db seeds:         Y"
     else
-      printf "\n    Run db seeds:        N"
+      printf "\n    Run db seeds:         N"
     fi
+  fi
+  if [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
+    printf "\npgAdmin:"
+    printf "\n    Default email:       ${pgadmin_default_email}"
+    printf "\n    Default password     ***${pgadmin_default_password: -3}"
   fi
   printf "\n-----------------------------------------------------------\n"
 }
@@ -1102,8 +1131,8 @@ if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\n\t    Root password: ${db_root_password: -3}"
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}\n"
-elif [[ "${service_db_admin^^}" == "PGADMIN4" ]]; then
-  printf "\n\tpgAdmin4:          http://localhost:${db_admin_port}"
+elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
+  printf "\n\tpgAdmin:           http://localhost:${db_admin_port}"
   printf "\n\t    Default email: ${pgadmin_default_email}"
   printf "\n\t    Default pw:    ***${pgadmin_default_password: -3}\n"
 fi

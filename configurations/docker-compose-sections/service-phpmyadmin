@@ -12,4 +12,6 @@
       - db-{{service_db}}
     ports:
       - {{db_admin_port}}:80
+    volumes:
+      - phpmyadmin-data:/var/lib/phpadmin
 

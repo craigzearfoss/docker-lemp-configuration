@@ -47,3 +47,4 @@
     networks:
       mongodb_network:
         name: mongodb_network
+

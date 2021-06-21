@@ -1,2 +1,5 @@
 volumes:
-  dbdata:
+  db-{{service_db}}-data:
+  phpmyadmin-data:
+  pgadmin-data:
+

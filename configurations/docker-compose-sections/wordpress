@@ -10,3 +10,4 @@
       WORDPRESS_DB_NAME: exampledb
     volumes:
       - wordpress:/var/www/html
+

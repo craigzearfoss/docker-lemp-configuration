@@ -13,6 +13,7 @@
       - "{{db_exposed_port}}:3306"
     volumes:
       - ./init-files/mysql:/docker-entrypoint-initdb.d
+      # - ./data/db:/var/lib/mysql
     networks:
       - {{project_name}}
 
