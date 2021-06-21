@@ -3,9 +3,14 @@
     container_name: {{project_name}}-postgres
     restart: always
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: test_db
+      PG_MODE: primary
+      PG_PRIMARY_USER: postgres
+      PG_PRIMARY_PASSWORD: {{db_root_password}}
+      PG_DATABASE: {{db_name}}
+      PG_USER: {{db_username}}
+      PG_PASSWORD: {{db_password}}
+      PG_ROOT_PASSWORD: {{db_root_password}}
+      PG_PRIMARY_PORT: 5432
     logging:
       options:
         max-size: 10m

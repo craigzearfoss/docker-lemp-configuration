@@ -2,8 +2,8 @@
     image: dpage/pgadmin4
     container_name: {{project_name}}-pgadmin4
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: root
+      PGADMIN_DEFAULT_EMAIL: {{pgadmin_default_email}}
+      PGADMIN_DEFAULT_PASSWORD: {{pgadmin_default_password}}
     restart: always
     networks:
       - {{project_name}}

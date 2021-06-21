@@ -40,6 +40,8 @@ db_password=
 db_port=3306
 db_exposed_port=6603
 dd_admin_port=$((${dd_admin_port} + 1))
+pgadmin_default_email="admin@admin.com"
+pgadmin_default_password="root"
 
 # Get a list of available databases
 db_services=("MySQL" "MariaDB" "Postgres")
@@ -69,6 +71,11 @@ laravel_jetstream_install_cmd=""
 
 empty_option_choice_is_valid=false
 
+is_email_valid() {
+  regex="^([A-Za-z]+[A-Za-z0-9]*((\.|\-|\_)?[A-Za-z]+[A-Za-z0-9]*){1,})@(([A-Za-z]+[A-Za-z0-9]*)+((\.|\-|\_)?([A-Za-z]+[A-Za-z0-9]*)+){1,})+\.([A-Za-z]{2,})+"
+  [[ "${1}" =~ $regex ]]
+}
+
 get_choice_response() {
   local __options=("$@")
 
@@ -94,12 +101,12 @@ get_yes_or_no_response() {
   local __default=$1
   valid_yes_no_responses=("Y N")
   good_reply=false
-  while [ "$good_reply" != true ]; do
+  while [ "${good_reply}" != true ]; do
     read response
     if [[ -z "${response}" ]] && [[ ! -z "${__default}" ]]; then
       response="${__default}"
     fi
-    response=${response^^}
+    response="${response^^}"
     if [[ " ${valid_yes_no_responses[@]} " =~ " ${response} " ]]; then
       good_reply=true
     fi
@@ -131,11 +138,14 @@ replace_variables_in_file() {
   sed -i "s/{{db_name}}/${db_name}/g" "${__file_to_process}"
   sed -i "s/{{db_password}}/${db_password}/g" "${__file_to_process}"
   sed -i "s/{{db_port}}/${db_port}/g" "${__file_to_process}"
+  sed -i "s/{{db_root_password}}/${db_root_password}/g" "${__file_to_process}"
   sed -i "s/{{db_username}}/${db_username}/g" "${__file_to_process}"
   sed -i "s/{{full_install}}/true/g" "${__file_to_process}"
   sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{nodejs_version}}/${nodejs_version}/g" "${__file_to_process}"
+  sed -i "s/{{pgadmin_default_email}}/${pgadmin_default_email}/g" "${__file_to_process}"
+  sed -i "s/{{pgadmin_default_password}}/${pgadmin_default_password}/g" "${__file_to_process}"
   sed -i "s/{{port}}/${port}/g" "${__file_to_process}"
   sed -i "s/{{project_name}}/${project_name}/g" "${__file_to_process}"
   sed -i "s/{{service_db}}/${service_db,,}/g" "${__file_to_process}"
@@ -215,7 +225,7 @@ set_port() {
     printf "${select_a_port_prompt}\n"
     read port
     port="${port:-${default_port}}"
-    if [[ "$port" -lt 1024 ||"$port" -gt 65535 ]]; then
+    if [[ "${port}" -lt 1024 || "${port}" -gt 65535 ]]; then
       select_a_port_prompt="\nA port must be in the range 1024 to 65535. Select a different port. [${default_port}] "
     elif [[ $(nc -w5 -z -v localhost "${port}" 2>&1) == *"succeeded"* ]]; then
       select_a_port_prompt="\nPort ${port} is in use. Select a different port. [${default_port}] "
@@ -278,7 +288,7 @@ set_php_framework() {
       valid_response=true
       selected_index=$((${response}))
       php_framework=""
-    elif [[ "$response" -gt 1 && "$response" -le "${#options[@]}" ]]; then
+    elif [[ "$response" -gt 1 && "${response}" -le "${#options[@]}" ]]; then
       valid_response=true
       selected_index=$((${response} - 2))
       php_framework="${php_frameworks[$selected_index]}"
@@ -400,6 +410,39 @@ set_database_admin_service() {
     get_yes_or_no_response "Y"
     if [[ "${response}" == "N" ]]; then
       service_db_admin=""
+    elif [[ "${service_db_admin^^}" == "PGADMIN4" ]]; then
+
+      # Get pgAdmin default email
+      printf "\nEnter the email address used to log into pgAdmin4: [${pgadmin_default_email}]\n"
+      valid_email=false
+      while [[ "${valid_email}" == false ]]; do
+        read entered_email
+        if [[ -z "${entered_email}" ]]; then
+          valid_email=true
+        else
+          if is_email_valid "${entered_email}"; then
+            pgadmin_default_email="${entered_email}"
+            valid_email=true
+          else
+            printf "\nInvalid email address.\n"
+            valid_email=false
+          fi
+        fi
+      done
+
+      # Get pgAdmin default password
+      printf "\nEnter database root password: [${pgadmin_default_password}]\n"
+      pgadmin_default_password=
+      while [ -z "${valid_password}" ]; do
+        read entered_password
+        if [[ -z "${entered_password}" ]]; then
+          valid_password=true
+        else
+          valid_password=true
+          pgadmin_default_password="${entered_password}"
+        fi
+      done
+
     fi
   fi
   if [[ ! -z "${service_db_admin}" ]]; then
@@ -436,7 +479,7 @@ set_nodejs_version() {
           res="${response//[^\.]}"
           dot_count="${#res}"
           if [[ "$dot_count" -eq 0 ]]; then
-            if [[ "$response" -gt 0 && "$response" -le "${#nodejs_versions[@]}" ]]; then
+            if [[ "${response}" -gt 0 && "${response}" -le "${#nodejs_versions[@]}" ]]; then
               valid_response=true
               selected_index=$((${response} - 1))
               nodejs_version="${nodejs_versions[$selected_index]}"
@@ -465,7 +508,7 @@ configure_database() {
   # Get database root password
   printf "\nEnter database root password.\n"
   db_root_password=
-  while [ -z "$db_root_password" ]; do
+  while [ -z "${db_root_password}" ]; do
     read db_root_password
   done
 
@@ -473,14 +516,14 @@ configure_database() {
   db_username=
   valid_username=false
   printf "\nEnter database username.\n"
-  while [ "$valid_username" = false ]; do
+  while [ "${valid_username}" = false ]; do
     read db_username
-    if [ -z "$db_username" ]; then
+    if [ -z "${db_username}" ]; then
       valid_username=false
-    elif [[ ! ($db_username =~ ^[A-Za-z0-9_-]+$) ]]; then
+    elif [[ ! ("${db_username}" =~ ^[A-Za-z0-9_-]+$) ]]; then
     printf "User name can only contain alphanumeric characters, underscores and dashes.\n"
       valid_username=false
-    elif [[ $(expr length "$db_username") -gt 20 ]]; then
+    elif [[ $(expr length "${db_username}") -gt 20 ]]; then
       printf "User name can be no longer than 20 characters.\n"
       valid_username=false
     else
@@ -491,7 +534,7 @@ configure_database() {
   # Get database user password
   printf "\nEnter database user password.\n"
   db_password=
-  while [ -z "$db_password" ]; do
+  while [ -z "${db_password}" ]; do
     read db_password
   done
 }
@@ -663,18 +706,18 @@ create_db_init_file() {
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
     echo "" >> ${init_db_file}
     echo "/*" >> ${init_db_file}
-    echo " Create administrator user" >> ${init_db_file}
-    echo "*/" >> ${init_db_file}
-    echo "CREATE DATABASE FLUSH ${db_name};" >> ${init_db_file}
-    echo "CREATE USER \"${db_username}'@'localhost' IDENTIFIED BY \"${db_password}\";" >> ${init_db_file}
-    echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'localhost' WITH GRANT OPTION;" >> ${init_db_file}
-    echo "CREATE USER '${db_username}'@'%' IDENTIFIED BY \"${db_password}\";" >> ${init_db_file}
-    echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'%' WITH GRANT OPTION;" >> ${init_db_file}
-    echo "FLUSH PRIVILEGES;" >> ${init_db_file}
+    echo " Create administrator user" >> "${init_db_file}"
+    echo "*/" >> "${init_db_file}"
+    echo "CREATE DATABASE FLUSH ${db_name};" >> "${init_db_file}"
+    echo "CREATE USER \"${db_username}'@'localhost' IDENTIFIED BY \"${db_password}\";" >> "${init_db_file}"
+    echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'localhost' WITH GRANT OPTION;" >> "${init_db_file}"
+    echo "CREATE USER '${db_username}'@'%' IDENTIFIED BY \"${db_password}\";" >> "${init_db_file}"
+    echo "GRANT ALL PRIVILEGES ON *.* TO '${db_username}'@'%' WITH GRANT OPTION;" >> "${init_db_file}"
+    echo "FLUSH PRIVILEGES;" >> "${init_db_file}"
   elif [[ "${service_db^^}" == "POSTGRES" ]]; then
     echo "create database ${db_name};" >> ${init_db_file}
-    echo "create user ${db_username} with encrypted password '${db_password}';" >> ${init_db_file}
-    echo "grant all privileges on database ${db_name} to ${db_username};" >> ${init_db_file}
+    echo "create user ${db_username} with encrypted password '${db_password}';" >> "${init_db_file}"
+    echo "grant all privileges on database ${db_name} to ${db_username};" >> "${init_db_file}"
   fi
 }
 
@@ -771,16 +814,16 @@ build_create_project_script() {
   echo '#!/bin/bash' > "${create_project_script}"
   #echo 'set -o errexit' > "${create_project_script}"
 
-  if [[ -z "$git_repo" ]] && [[ -z "$php_framework" ]]; then
+  if [[ -z "${git_repo}" ]] && [[ -z "{$php_framework}" ]]; then
     # No PHP framework or git repository specified so just create a <webroot>/index.php file
     cat "${working_dir}/configurations/scripts/create_web_root_index_file.sh" >> "${create_project_script}"
   else
-    if [[ ! -z "$git_repo" ]]; then
+    if [[ ! -z "${git_repo}" ]]; then
       # Install project from a git repository
       cat "${working_dir}/configurations/scripts/git-clone_repo.sh" >> "${create_project_script}"
     else
       framework_install_script="${working_dir}/configurations/php-frameworks/${php_framework}/install.sh"
-      if [[ ! -f "$framework_install_script" ]]; then
+      if [[ ! -f "${framework_install_script}" ]]; then
         printf "\n-------------------------------------------------------------------"
         printf "\nPHP frame install file  ${framework_install_script} does not exist."
         printf "\n-------------------------------------------------------------------"
@@ -924,7 +967,7 @@ display_configuration() {
   printf "\nServer:                   ${service_server}"
   printf "\nPHP version:              ${php_version}"
   printf "\nPHP framework:            ${php_framework}"
-  if [[ "${php_framework}" == "Symfony" ]] && [[ "${full_install}" == false ]]; then
+  if [[ "${php_framework^^}" == "SYMFONY" ]] && [[ "${full_install}" == false ]]; then
     printf " (Partial install)"
   fi
   if [ ! -z "${nodejs_version}" ]; then
@@ -1061,10 +1104,8 @@ if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\n\t    Password:      ***${db_password: -3}\n"
 elif [[ "${service_db_admin^^}" == "PGADMIN4" ]]; then
   printf "\n\tpgAdmin4:          http://localhost:${db_admin_port}"
-  printf "\n\t    Postgres user: admin?"
-  printf "\n\t    Postgres pw:   ?????"
-  printf "\n\t    App user:      ${db_username}"
-  printf "\n\t    App pw:        ***${db_password: -3}\n"
+  printf "\n\t    Default email: ${pgadmin_default_email}"
+  printf "\n\t    Default pw:    ***${pgadmin_default_password: -3}\n"
 fi
 if [[ "${create_phpinfo_file}" == true ]]; then
   printf "\n\tPHP Information:   ${site_url}/phpinfo.php\n"
