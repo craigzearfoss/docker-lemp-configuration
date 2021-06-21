@@ -4,6 +4,7 @@ docker_version="3.7"
 script_completed=false
 
 working_dir="$(pwd)"
+user="devuser"
 
 service_app="app"
 service_server="NGINX" # NGINX
@@ -140,6 +141,7 @@ replace_variables_in_file() {
   sed -i "s/{{service_db}}/${service_db,,}/g" "${__file_to_process}"
   sed -i "s/{{service_db_admin}}/${service_db_admin,,}/g" "${__file_to_process}"
   sed -i "s/{{service_server}}/${service_server,,}/g" "${__file_to_process}"
+  sed -i "s/{{user}}/${user}/g" "${__file_to_process}"
   sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${__file_to_process}"
 }
 
@@ -760,7 +762,7 @@ build_create_project_script() {
   fi
 
   echo '#!/bin/bash' > "${create_project_script}"
-  echo 'set -o errexit' > "${create_project_script}"
+  #echo 'set -o errexit' > "${create_project_script}"
 
   if [[ -z "$git_repo" ]] && [[ -z "$php_framework" ]]; then
     # No PHP framework or git repository specified so just create a <webroot>/index.php file
@@ -862,8 +864,8 @@ run_post_install_processes(){
 
 run_create_project_script() {
   printf "\n\nBuilding project ...."
-  printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh --user=devuser\n"
-  docker exec -t "${project_name}-app" bash create_project.sh --user=devuser
+  printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh --user=${user}\n"
+  docker exec -t "${project_name}-app" bash create_project.sh "--user=${user}"
 }
 
 populate_containers_created_array() {

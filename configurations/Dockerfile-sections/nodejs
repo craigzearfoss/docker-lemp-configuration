@@ -1,6 +1,7 @@
 # Install Node
-#ENV NVM_DIR /usr/nvm
-ENV NVM_DIR=/root/.nvm
+ENV NVM_DIR /usr/nvm
+RUN mkdir /usr/nvm
+#ENV NVM_DIR=/root/.nvm
 ENV NODE_VERSION={{nodejs_version}}
 RUN curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
