@@ -1,0 +1,5 @@
+Redis
+    - https://kb.objectrocket.com/redis/run-redis-with-docker-compose-1055
+
+MongoDB
+    - https://www.bmc.com/blogs/mongodb-docker-container/

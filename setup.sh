@@ -636,13 +636,20 @@ create_server_conf_file() {
 }
 
 create_db_init_file() {
-  # entrypoint file(s)
-
+  # For MySQL and MariaDB
   printf "\nAdding database credentials ..."
   export DB_DATABASE="${db_name}"
   export DB_ROOT_PASSWORD="${db_root_password}"
   export DB_USERNAME="${db_username}"
   export DB_PASSWORD="${db_password}"
+
+  # For Postgres
+  export POSTGRES_DB="${db_name}"
+  export POSTGRES_USER="admin"
+  export POSTGRES_PASSWORD="${db_root_password}"
+  export APP_DB_NAME="${db_name}"
+  export APP_DB_USER="${db_username}"
+  export APP_DB_PASS="${db_username}"
 
   # copy db entrypoint file
   printf "\nCopying init-files/${init_db_file##*/} ..."
@@ -1039,23 +1046,29 @@ script_completed=true
 display_configuration
 
 printf "\nYou can now access the following in your browser:"
-printf "\n\tWebsite:         ${site_url}\n"
+printf "\n\tWebsite:             ${site_url}\n"
 if [[ "${php_framework^^}" == "WORDPRESS" ]]; then
-  printf "\t    Database Name: ${project_name}"
+  printf "\n\t    Database name: ${project_name}"
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}"
-  printf "\n\t    Database Host: db-${service_db,,}\n"
+  printf "\n\t    Database host: db-${service_db,,}\n"
 fi
 if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
-  printf "\n\tphpMyAdmin:      ${db_admin_url}"
-  printf "\n\t    Server:   db-${service_db,,}"
-  printf "\n\t    Username: ${db_username}"
-  printf "\n\t    Password: ***${db_password: -3}\n"
+  printf "\n\tphpMyAdmin:        ${db_admin_url}"
+  printf "\n\t    Server:        db-${service_db,,}"
+  printf "\n\t    Root password: ${db_root_password}"
+  printf "\n\t    Username:      ${db_username}"
+  printf "\n\t    Password:      ***${db_password: -3}\n"
 elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
-  printf "\tpgAdmin:           http://localhost:${db_admin_port}\n"
+  printf "\n\tpgAdmin:           http://localhost:${db_admin_port}"
+  printf "\n\t    Postgres user: admin?"
+  printf "\n\t    Postgres pw:   ?????"
+  printf "\n\t    App user:      ${db_username}"
+  printf "\n\t    App pw:        ***${db_password: -3}\n"
 fi
 if [[ "${create_phpinfo_file}" == true ]]; then
-  printf "\n\tPHP Information: ${site_url}/phpinfo.php"
+  printf "\n\tPHP Information:
+  ${site_url}/phpinfo.php"
 fi
 
 printf "\n\nTo access the Docker container:"
