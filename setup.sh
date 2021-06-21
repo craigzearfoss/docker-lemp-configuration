@@ -1060,7 +1060,7 @@ if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}\n"
 elif [[ "${service_db_admin^^}" == "PGADMIN4" ]]; then
-  printf "\n\tpgAdmin:           http://localhost:${db_admin_port}"
+  printf "\n\tpgAdmin4:          http://localhost:${db_admin_port}"
   printf "\n\t    Postgres user: admin?"
   printf "\n\t    Postgres pw:   ?????"
   printf "\n\t    App user:      ${db_username}"
