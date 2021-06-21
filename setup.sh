@@ -1045,8 +1045,8 @@ script_completed=true
 # Display the project configuration
 display_configuration
 
-printf "\nYou can now access the following in your browser:"
-printf "\n\tWebsite:             ${site_url}\n"
+printf "\nYou can now access the following in your browser:\n"
+printf "\n\tWebsite:           ${site_url}\n"
 if [[ "${php_framework^^}" == "WORDPRESS" ]]; then
   printf "\n\t    Database name: ${project_name}"
   printf "\n\t    Username:      ${db_username}"
@@ -1056,7 +1056,7 @@ fi
 if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\n\tphpMyAdmin:        ${db_admin_url}"
   printf "\n\t    Server:        db-${service_db,,}"
-  printf "\n\t    Root password: ${db_root_password}"
+  printf "\n\t    Root password: ${db_root_password: -3}"
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}\n"
 elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
@@ -1067,14 +1067,13 @@ elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
   printf "\n\t    App pw:        ***${db_password: -3}\n"
 fi
 if [[ "${create_phpinfo_file}" == true ]]; then
-  printf "\n\tPHP Information:
-  ${site_url}/phpinfo.php"
+  printf "\n\tPHP Information:   ${site_url}/phpinfo.php\n"
 fi
 
-printf "\n\nTo access the Docker container:"
-printf "\n\tdocker exec -it ${project_name}-app bash"
+printf "\nTo access the Docker container:"
+printf "\n\tdocker exec -it ${project_name}-app bash\n"
 
-printf "\n\nTo destroy all Docker containers that were created:"
+printf "\nTo destroy all Docker containers that were created:"
 printf "\n\tbash destroy.sh ${project_name}\n"
 
 if [[ -z "${php_framework}" ]] && [[ -z "${git_rep}" ]]; then
