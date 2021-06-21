@@ -5,6 +5,7 @@ script_completed=false
 
 working_dir="$(pwd)"
 
+service_app="app"
 service_server="NGINX" # NGINX
 service_db="MySQL"     # MySQL / MariaDB / Postgres
 service_db_admin=""    # phpMyAdmin or pgAdmin
@@ -14,6 +15,7 @@ containers_created=()
 
 create_app_service=true
 
+node_install_required=false # some applications require that we install node
 nodejs_version=""
 nodejs_versions=("16.3.0" "14.17.1" "12.22.1")
 project_name=$1
@@ -61,6 +63,8 @@ db_admin_url="http://localhost:${db_admin_port}"
 
 create_phpinfo_file="N"
 create_project_script="create_project_script"
+
+laravel_jetstream_install_cmd=""
 
 empty_option_choice_is_valid=false
 
@@ -296,6 +300,27 @@ set_php_framework() {
   fi
 }
 
+set_laravel_jetstream() {
+  # Note: Only install Laravel Jetstream on new projects
+  if [[ -z "${git_repo}" ]]; then
+    printf "\nLaravel Jetstream provides login, registration, email verification, two-factor authentication,"
+    printf "\nsession management, API via Laravel Sanctum, and optional team management features."
+    printf "\nInstall Laravel Jetstream? [N]\n"
+    get_yes_or_no_response "N"
+    if [[ "${response}" == "Y" ]]; then
+      options=("php artisan jetstream:install livewire" "php artisan jetstream:install livewire --teams" "php artisan jetstream:install inertia" "php artisan jetstream:install inertia --teams" "Cancel (Don't install Jetstream.)")
+      printf "\nSelect which flavor of Jetstream to install: "
+      printf "\nNote that Livewire uses Blade templating and Inertia uses Vue.js."
+      empty_option_choice_is_valid=false
+      get_choice_response "${options[@]}"
+      if [ "${response}" -ne 5 ]; then
+        laravel_jetstream_install_cmd="${options[$response]}"
+        node_install_required=true
+      fi
+    fi
+  fi
+}
+
 is_this_a_full_install() {
   if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]]; then
     printf "\nIs this a full install? [Y]"
@@ -385,48 +410,52 @@ set_database_admin_service() {
 }
 
 set_nodejs_version() {
-  printf "\nInstall Node.js? [Y]\n"
-  get_yes_or_no_response "Y"
-  if [[ "${response}" == "Y" ]]; then
-    printf "\nSelect the Node.js version. [1]"
-    i=1
-    for version in "${nodejs_versions[@]}"; do
-      printf "\n\t${i} - ${version##*/}"
-      i=$((${i} + 1))
-    done
-    printf "\n"
-    valid_response=false
-    while [[ "${valid_response}" == false ]]; do
-      read response
-      re='^[0-9]+$'
-      if [[ -z "${response}" ]]; then
-        valid_response=true
-        nodejs_version="${nodejs_versions[0]}"
-      else
-        res="${response//[^\.]}"
-        dot_count="${#res}"
-        if [[ "$dot_count" -eq 0 ]]; then
-          if [[ "$response" -gt 0 && "$response" -le "${#nodejs_versions[@]}" ]]; then
-            valid_response=true
-            selected_index=$((${response} - 1))
-            nodejs_version="${nodejs_versions[$selected_index]}"
-          else
-            valid_response=false
-            printf "\nInvalid selection or Node.js version.\n"
-          fi
+  if [[ "${node_install_required}" == true ]]; then
+    nodejs_version=${nodejs_versions[0]}
+  else
+    printf "\nInstall Node.js? [Y]\n"
+    get_yes_or_no_response "Y"
+    if [[ "${response}" == "Y" ]]; then
+      printf "\nSelect the Node.js version. [1]"
+      i=1
+      for version in "${nodejs_versions[@]}"; do
+        printf "\n\t${i} - ${version##*/}"
+        i=$((${i} + 1))
+      done
+      printf "\n"
+      valid_response=false
+      while [[ "${valid_response}" == false ]]; do
+        read response
+        re='^[0-9]+$'
+        if [[ -z "${response}" ]]; then
+          valid_response=true
+          nodejs_version="${nodejs_versions[0]}"
         else
-          if [ "${#res}" -eq 2 ]; then
-            valid_response=true
-            nodejs_version="${response}"
+          res="${response//[^\.]}"
+          dot_count="${#res}"
+          if [[ "$dot_count" -eq 0 ]]; then
+            if [[ "$response" -gt 0 && "$response" -le "${#nodejs_versions[@]}" ]]; then
+              valid_response=true
+              selected_index=$((${response} - 1))
+              nodejs_version="${nodejs_versions[$selected_index]}"
+            else
+              valid_response=false
+              printf "\nInvalid selection or Node.js version.\n"
+            fi
           else
-            valid_response=false
-            printf "\nInvalid Node.js version.\n"
+            if [ "${#res}" -eq 2 ]; then
+              valid_response=true
+              nodejs_version="${response}"
+            else
+              valid_response=false
+              printf "\nInvalid Node.js version.\n"
+            fi
           fi
         fi
-      fi
-    done
-  else
-    nodejs_version=""
+      done
+    else
+      nodejs_version=""
+    fi
   fi
 }
 
@@ -664,12 +693,32 @@ initialize_laminas_project() {
 
 initialize_laravel_project() {
   cat "${working_dir}/configurations/php-frameworks/Laravel/initialize_env.sh" >> "${create_project_script}"
-  #if [[ $run_db_migrations == true ]]; then
-  #  cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
-  #fi
-  #if [[ $run_db_seeds == true ]]; then
-  #  cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
-  #fi
+
+  if [[ ! -z "${laravel_jetstream_install_cmd}" ]]; then
+    printf "\n# Install Laravel Jetstream\n" >> "${create_project_script}"
+    echo "cd /var/www/site" >> "${create_project_script}"
+    echo "composer require laravel/jetstream" >> "${create_project_script}"
+    echo "${laravel_jetstream_install_cmd}" >> "${create_project_script}"
+    echo "npm install" >> "${create_project_script}"
+    echo "npm run dev" >> "${create_project_script}"
+    run_db_migrations=true  # Always run database migrations when installing Jetstream
+  fi
+
+  if [[ $run_db_migrations == true ]]; then
+    cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
+  fi
+  if [[ $run_db_seeds == true ]]; then
+    cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
+  fi
+
+  substring="livewire"
+  if grep -q "livewire" <<< "laravel_jetstream_install_cmd"; then
+    echo "" >> "${create_project_script}"
+    echo "# Publish the Livewire stack's Blade components" >>  "${create_project_script}"
+    echo "cd /var/www/site" >> "${create_project_script}"
+    echo "php artisan vendor:publish --tag=jetstream-views" >> "${create_project_script}"
+    echo "npm run dev" >> "${create_project_script}"
+  fi
 }
 
 initialize_lumen_project() {
@@ -787,7 +836,7 @@ prompt_to_build_images() {
     printf "\n\tdocker-compose up -d"
     printf "\n\tdocker-compose ps"
     printf "\n\nThen to create the project run the create_project script: "
-    printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh\n"
+    printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh --user=www-data\n"
     exit
   fi
 
@@ -812,8 +861,9 @@ run_post_install_processes(){
 }
 
 run_create_project_script() {
-  printf "\n\nBuilding project ....\n"
-  docker exec -t "${project_name}-app" bash create_project.sh
+  printf "\n\nBuilding project ...."
+  printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh --user=devuser\n"
+  docker exec -t "${project_name}-app" bash create_project.sh --user=devuser
 }
 
 populate_containers_created_array() {
@@ -923,6 +973,10 @@ set_git_repo
 
 # Set PHP framework or empty
 set_php_framework
+
+if [[ "${php_framework^^}" == "LARAVEL" ]]; then
+  set_laravel_jetstream
+fi
 
 # Is this a full install?
 is_this_a_full_install

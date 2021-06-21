@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo  "Initializing CodeIgniter .env file ..."
-cd "/var/www/site"
+cd /var/www/site
 
 # Set variables
 env_file="/var/www/site/.env"

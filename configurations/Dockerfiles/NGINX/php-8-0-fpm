@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
+    wget \
     zip \
     unzip
 
@@ -37,8 +38,7 @@ RUN pecl install xdebug \
 
 # Install vim and nano
 RUN apt-get -y update \
-    && apt-get install -y vim nano \
-    && apt install wget
+    && apt-get install -y vim nano
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

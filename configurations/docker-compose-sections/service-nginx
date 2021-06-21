@@ -9,4 +9,3 @@
       - ./conf-files/:/etc/nginx/conf.d/
     networks:
       - {{project_name}}
-

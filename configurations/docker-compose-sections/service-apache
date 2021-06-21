@@ -1,0 +1,14 @@
+  apache:
+    image: 'laravelapp'
+    container_name: {{project_name}}-apache
+    restart: unless-stopped
+    ports:
+      - {{port}}:80
+    environment:
+      - APACHE_RUN_USER=#${UID}
+      - APACHE_RUN_GROUP=#${UID}
+    volumes:
+      - ./:/var/www
+      - ./conf-files/:/etc/apache/conf.d/
+    networks:
+      - {{project_name}}

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo  "Initializing Laravel .env file ..."
-cd "/var/www/site"
+cd /var/www/site
 
 # Set variables
 env_file="/var/www/site/.env"
@@ -20,7 +20,7 @@ service_db="{{service_db}}"
 web_root="{{web_root}}"
 
 # Make sure .env file exists
-if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
+if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/.env.example" ]]; then
   cp /var/www/site/.env.example "${env_file}"
 fi
 
@@ -39,6 +39,11 @@ if [[ -f "$env_file" ]]; then
   sed -i "s/DB_USERNAME=.*/DB_USERNAME=${db_username}/g" "${env_file}"
   sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" "${env_file}"
 fi
+
+# Generate app encryption key
+echo  "Generating app encryption key ..."
+cd /var/www/site
+php artisan key:generate
 
 # Clear Laravel cache
 echo  "Clearing Laravel cache ..."

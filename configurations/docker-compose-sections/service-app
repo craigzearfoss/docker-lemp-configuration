@@ -1,7 +1,7 @@
   app:
     build:
       args:
-        user: sammy
+        user: devuser
         uid: 1000
       context: ./
       dockerfile: Dockerfile
