@@ -391,7 +391,7 @@ set_database_admin_service() {
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
     service_db_admin="phpMyAdmin"
   elif [[ "${service_db^^}" == "POSTGRES" ]]; then
-    service_db_admin="pgAdmin"
+    service_db_admin="pgAdmin4"
   else
     service_db_admin=""
   fi
@@ -907,8 +907,8 @@ display_configuration() {
   printf "\nWebsite URL:              ${site_url}"
   if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
     printf "\nphpMyAdmin URL:           ${db_admin_url}"
-  elif [[ "${service_db_admin^^}" == "PGMYADMIN" ]]; then
-    printf "\npgAdmin URL :             ${db_admin_url}"
+  elif [[ "${service_db_admin^^}" == "PGMYADMIN4" ]]; then
+    printf "\npgAdmin4 URL :            ${db_admin_url}"
   fi
   if [[ "${create_phpinfo_file}" == true ]]; then
     printf "\nPHP Information:          ${site_url}/phpinfo.php"
@@ -1059,7 +1059,7 @@ if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\n\t    Root password: ${db_root_password: -3}"
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}\n"
-elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
+elif [[ "${service_db_admin^^}" == "PGADMIN4" ]]; then
   printf "\n\tpgAdmin:           http://localhost:${db_admin_port}"
   printf "\n\t    Postgres user: admin?"
   printf "\n\t    Postgres pw:   ?????"

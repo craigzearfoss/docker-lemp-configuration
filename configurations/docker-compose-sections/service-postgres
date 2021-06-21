@@ -16,14 +16,3 @@
       - ./init-files/postgres:/docker-entrypoint-initdb.d/init.sql
     networks:
       - {{project_name}}
-
-  pgadmin:
-    container_name: {{project_name}}_pgadmin4
-    image: dpage/pgadmin4
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: root
-    ports:
-      - "{{db_admin_port}}:80"
-

@@ -1,0 +1,14 @@
+  pgadmin4:
+    image: dpage/pgadmin4
+    container_name: {{project_name}}-pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    restart: always
+    networks:
+      - {{project_name}}
+    depends_on:
+      - db-{{service_db}}
+    ports:
+      - "{{db_admin_port}}:80"
+

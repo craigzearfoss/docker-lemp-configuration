@@ -32,7 +32,7 @@ if [[ "$docker_env}" == "mailhog" ]]; then
 else
 
   # No container name parameter passed
-  container_suffixes=("app" "nginx" "mysql" "mariadb" "postgres" "phpmyadmin" "pgadmin")
+  container_suffixes=("app" "nginx" "mysql" "mariadb" "postgres" "phpmyadmin" "pgadmin4")
   for suffix in "${container_suffixes[@]}";
   do
     printf "\nKilling container ${docker_env}-${suffix} ...\n\t"
