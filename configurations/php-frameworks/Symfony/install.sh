@@ -21,9 +21,9 @@ cd /var/www
 
 full_install= {{full_install}}
 if [[ "${full_install}" == true ]]; then
-  composer create-project symfony/website-skeleton site
+  composer create-project symfony/website-skeleton site --no-interaction
 else
-  composer create-project symfony/skeleton site
+  composer create-project symfony/skeleton site --no-interaction
 fi
 
 # Install vendor files

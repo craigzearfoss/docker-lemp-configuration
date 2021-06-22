@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project --prefer-dist laravel/lumen site
+composer create-project --prefer-dist laravel/lumen site --no-interaction
 
 # Install vendor files
 cd /var/www/site

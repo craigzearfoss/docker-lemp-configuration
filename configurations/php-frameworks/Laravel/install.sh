@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project laravel/laravel site
+composer create-project laravel/laravel site --no-interaction
 
 # Install vendor files
 cd /var/www/site

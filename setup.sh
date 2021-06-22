@@ -134,24 +134,27 @@ join_by() {
 
 replace_variables_in_file() {
   local __file_to_process=$1
+  sed -i "s/{{create_phpinfo_file}}/${create_phpinfo_file//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{db_admin_port}}/${db_admin_port}/g" "${__file_to_process}"
+  sed -i "s/{{db_admin_url}}/${db_admin_url//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{db_exposed_port}}/${db_exposed_port}/g" "${__file_to_process}"
   sed -i "s/{{db_name}}/${db_name}/g" "${__file_to_process}"
-  sed -i "s/{{db_password}}/${db_password}/g" "${__file_to_process}"
+  sed -i "s/{{db_password}}/${db_password//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{db_port}}/${db_port}/g" "${__file_to_process}"
-  sed -i "s/{{db_root_password}}/${db_root_password}/g" "${__file_to_process}"
+  sed -i "s/{{db_root_password}}/${db_root_password//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{db_username}}/${db_username}/g" "${__file_to_process}"
   sed -i "s/{{full_install}}/true/g" "${__file_to_process}"
   sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{nodejs_version}}/${nodejs_version}/g" "${__file_to_process}"
   sed -i "s/{{pgadmin_default_email}}/${pgadmin_default_email}/g" "${__file_to_process}"
-  sed -i "s/{{pgadmin_default_password}}/${pgadmin_default_password}/g" "${__file_to_process}"
+  sed -i "s/{{pgadmin_default_password}}/${pgadmin_default_password//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{port}}/${port}/g" "${__file_to_process}"
   sed -i "s/{{project_name}}/${project_name}/g" "${__file_to_process}"
   sed -i "s/{{service_db}}/${service_db,,}/g" "${__file_to_process}"
   sed -i "s/{{service_db_admin}}/${service_db_admin,,}/g" "${__file_to_process}"
   sed -i "s/{{service_server}}/${service_server,,}/g" "${__file_to_process}"
+  sed -i "s/{{site_url}}/${site_url//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{user}}/${user}/g" "${__file_to_process}"
   sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${__file_to_process}"
 }
@@ -554,7 +557,7 @@ configure_database() {
 }
 
 run_database_migrations() {
-  if [[ "${frameworks_with_db_migrations[@]}" =~ "${php_framework}" ]]; then
+  if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_db_migrations[@]}" =~ "${php_framework}" ]]; then
     printf "\nRun database migrations? [N]\n"
     get_yes_or_no_response "N"
     if [[ "${response}" == "Y" ]]; then
@@ -566,7 +569,7 @@ run_database_migrations() {
 }
 
 run_database_seeds() {
-  if [[ "${frameworks_with_db_seeds[@]}" =~ "${php_framework}" ]]; then
+  if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_db_seeds[@]}" =~ "${php_framework}" ]]; then
     printf "\nRun database seeds? [N]\n"
     get_yes_or_no_response "N"
     if [[ "${response}" == "Y" ]]; then
@@ -750,7 +753,7 @@ initialize_cakephp_project() {
 }
 
 initialize_codeigniter_project() {
-  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/initialize_env.sh" >> "${create_project_script}"
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
   #if [[ $run_db_migrations == true ]]; then
   #  cat "${working_dir}/configurations/php-frameworks/CodeIgniter/migrate.sh" >> "${create_project_script}"
   #fi
@@ -768,7 +771,7 @@ initialize_laminas_project() {
 }
 
 initialize_laravel_project() {
-  cat "${working_dir}/configurations/php-frameworks/Laravel/initialize_env.sh" >> "${create_project_script}"
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 
   if [[ ! -z "${laravel_jetstream_install_cmd}" ]]; then
     printf "\n# Install Laravel Jetstream\n" >> "${create_project_script}"
@@ -810,7 +813,7 @@ initialize_slim_project() {
 }
 
 initialize_symfony_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
 
 initialize_wordpress_project() {
@@ -838,7 +841,7 @@ build_create_project_script() {
   echo '#!/bin/bash' > "${create_project_script}"
   #echo 'set -o errexit' > "${create_project_script}"
 
-  if [[ -z "${git_repo}" ]] && [[ -z "{$php_framework}" ]]; then
+  if [[ -z "${git_repo}" ]] && [[ -z "${php_framework}" ]]; then
     # No PHP framework or git repository specified so just create a <webroot>/index.php file
     cat "${working_dir}/configurations/scripts/create_web_root_index_file.sh" >> "${create_project_script}"
   else
@@ -915,7 +918,6 @@ prompt_to_build_images() {
     printf "\n\tdocker exec -t ${project_name}-app bash create_project.sh --user=www-data\n"
     exit
   fi
-
 }
 
 build_docker_images() {

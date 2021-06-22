@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project --prefer-dist cakephp/app:~4.0 site
+composer create-project --prefer-dist cakephp/app:~4.0 site --no-interaction
 
 # Install vendor files
 cd /var/www/site

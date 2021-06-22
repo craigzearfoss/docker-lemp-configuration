@@ -57,5 +57,5 @@ RUN chmod +x /var/www/create_project.sh
 # Set working directory
 WORKDIR /var/www
 
-#USER $user
+USER $user
 

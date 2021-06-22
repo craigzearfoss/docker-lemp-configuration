@@ -27,7 +27,7 @@ RUN apt-get -y update \
     && docker-php-ext-configure intl \
     && docker-php-ext-install intl
 
-# Needed for CodeIgniter
+# Install additional PHP extensions
 RUN docker-php-ext-install mysqli
 
 # Install XDebug
@@ -58,3 +58,4 @@ RUN chmod +x /var/www/create_project.sh
 WORKDIR /var/www
 
 USER $user
+

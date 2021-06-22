@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer require --dev laminas/laminas-component-installer
+composer require --dev laminas/laminas-component-installer --no-interaction
 
 # Install vendor files
 cd /var/www/site

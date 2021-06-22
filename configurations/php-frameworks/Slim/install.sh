@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project slim/slim-skeleton:dev-master site
+composer create-project slim/slim-skeleton:dev-master site --no-interaction
 
 # Install vendor files
 cd /var/www/site

@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project codeigniter4/appstarter site
+composer create-project codeigniter4/appstarter site --no-interaction
 chmod -R 0777 /var/www/site
 
 # Install vendor files

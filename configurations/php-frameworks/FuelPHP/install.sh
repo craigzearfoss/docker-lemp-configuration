@@ -19,7 +19,7 @@ fi
 
 cd /var/www
 
-composer create-project fuel/fuel --prefer-dist site
+composer create-project fuel/fuel --prefer-dist site --no-interaction
 
 # Install vendor files
 cd /var/www/site
