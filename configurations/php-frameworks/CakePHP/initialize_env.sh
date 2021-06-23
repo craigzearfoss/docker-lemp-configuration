@@ -24,7 +24,7 @@ if [[ ! -f "${config_file}" ]] && [[ -f "${example_config_file}" ]]; then
   cp "${example_config_file}" "${config_file}"
 fi
 
-if [[ -f "config_file" ]]; then
+if [[ -f "${config_file}" ]]; then
 
   # Update database configuration
   echo "Updating database configurations ..."
