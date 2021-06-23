@@ -224,7 +224,7 @@ set_php_version() {
 
 set_port() {
   port_is_in_use=true
-  select_a_port_prompt="\nSelect a port [${default_port}]: "
+  select_a_port_prompt="\nSelect a port: [${default_port}]"
   while [[ "${port_is_in_use}" == true ]]; do
     printf "${select_a_port_prompt}\n"
     read port
@@ -469,7 +469,7 @@ set_nodejs_version() {
     printf "\nInstall Node.js? [Y]\n"
     get_yes_or_no_response "Y"
     if [[ "${response}" == "Y" ]]; then
-      printf "\nSelect the Node.js version. [1]"
+      printf "\nSelect the Node.js version: [1]"
       i=1
       for version in "${nodejs_versions[@]}"; do
         printf "\n\t${i} - ${version##*/}"
@@ -514,7 +514,7 @@ set_nodejs_version() {
 
 configure_database() {
   # Get database root password
-  printf "\nEnter database root password.\n"
+  printf "\nEnter database root password:\n"
   db_root_password=
   while [ -z "${db_root_password}" ]; do
     read db_root_password
@@ -523,7 +523,7 @@ configure_database() {
   # Get database username
   db_username=
   valid_username=false
-  printf "\nEnter database username.\n"
+  printf "\nEnter database username:\n"
   while [ "${valid_username}" = false ]; do
     read db_username
     if [ -z "${db_username}" ]; then
@@ -540,7 +540,7 @@ configure_database() {
   done
 
   # Get database user password
-  printf "\nEnter database user password.\n"
+  printf "\nEnter database user password:\n"
   db_password=
   while [ -z "${db_password}" ]; do
     read db_password
