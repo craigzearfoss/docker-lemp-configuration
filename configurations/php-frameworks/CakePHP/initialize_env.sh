@@ -27,7 +27,7 @@ fi
 if [[ -f "config_file" ]]; then
 
   # Update database configuration
-  echo "Modifying .env file ..."
+  echo "Updating database configurations ..."
   sed -i "0,/.*'host' =>.*/{s/.*'host' => 'localhost',.*/            'host' => 'db-${service_db,,}',/g}" "${config_file}"
   sed -i "0,/.*'username' =>.*/{s/.*'username' => 'my_app',.*/            'username' => '${db_username}',/g}" "${config_file}"
   sed -i "0,/.*'password' =>.*/{s/.*'password' => 'secret',.*/            'password' => '${db_password}',/g}" "${config_file}"
