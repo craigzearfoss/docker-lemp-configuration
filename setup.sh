@@ -1118,7 +1118,6 @@ fi
 if [[ "${service_db_admin^^}" == "PHPMYADMIN" ]]; then
   printf "\n\tphpMyAdmin:        ${db_admin_url}"
   printf "\n\t    Server:        db-${service_db,,}"
-  printf "\n\t    Root password: ${db_root_password: -3}"
   printf "\n\t    Username:      ${db_username}"
   printf "\n\t    Password:      ***${db_password: -3}\n"
 elif [[ "${service_db_admin^^}" == "PGADMIN" ]]; then
