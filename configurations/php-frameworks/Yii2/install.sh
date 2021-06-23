@@ -19,7 +19,12 @@ fi
 
 cd /var/www
 
-composer create-project --prefer-dist yiisoft/yii2-app-basic site --no-interaction
+full_install= {{full_install}}
+if [[ "${full_install}" == true ]]; then
+  composer create-project --prefer-dist yiisoft/yii2-app-basic site --no-interaction
+else
+  composer create-project --prefer-dist yiisoft/yii2-app-basic basic --no-interaction
+fi
 
 # Install vendor files
 cd /var/www/site

@@ -35,5 +35,3 @@ if [[ -f "${config_file}" ]]; then
 
   # @TODO: Need to add updates for email configuration
 fi
-
-# Clear CakePHP cache

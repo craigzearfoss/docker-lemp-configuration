@@ -53,7 +53,7 @@ for entry in configurations/php-frameworks/*; do
   php_frameworks+=("${entry##*/}")
 done
 
-frameworks_with_partial_installs=("Symfony")
+frameworks_with_partial_installs=("Symfony" "Yii2")
 frameworks_with_db_migrations=("CodeIgniter" "Laravel")
 frameworks_with_db_seeds=("CodeIgniter" "Laravel")
 
@@ -339,7 +339,11 @@ set_laravel_jetstream() {
 
 is_this_a_full_install() {
   if [[ ! -z "${php_framework}" ]] && [[ "${frameworks_with_partial_installs[@]}" =~ "${php_framework}" ]]; then
-    printf "\nIs this a full install? [Y]"
+    msg_prompt="\nIs this a full install? [Y]"
+    if [[ "${php_framework^^}" == "YII2" ]]; then
+      msg_prompt="\nInstall the Advanced Project Template? [Y]"
+    fi
+    printf "${msg_prompt}"
     get_yes_or_no_response "Y"
     if [[ "${response}" == "Y" ]]; then
       full_install=true
@@ -977,6 +981,8 @@ display_configuration() {
   printf "\nPHP framework:            ${php_framework}"
   if [[ "${php_framework^^}" == "SYMFONY" ]] && [[ "${full_install}" == false ]]; then
     printf " (Partial install)"
+  elif [[ "${php_framework^^}" == "YII2" ]] && [[ "${full_install}" == true ]]; then
+    printf " (Advanced Project Template)"
   fi
   if [ ! -z "${nodejs_version}" ]; then
     printf "\nNode.js version:          ${nodejs_version}"

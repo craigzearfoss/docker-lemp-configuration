@@ -45,7 +45,7 @@ else
   printf "\nRemoving image ${docker_env} ...\n\t"
   docker image rm "${docker_env}"
 
-  printf "\nAll containers for '${docker_env}' have been destroyed.\n\t"
+  printf "\nAll containers and images for '${docker_env}' have been destroyed.\n\t"
   printf "\nIf you want to destroy the mailhog container run the following command:"
   printf "\n\tbash destroy.sh mailhog"
   printf "\n\nThe directory '${docker_env}' has NOT been deleted."
