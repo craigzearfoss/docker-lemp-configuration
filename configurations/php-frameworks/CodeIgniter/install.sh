@@ -24,4 +24,4 @@ chmod -R 0777 /var/www/site
 
 # Install vendor files
 cd /var/www/site
-composer update
+composer update --no-interaction

@@ -19,8 +19,8 @@ fi
 
 cd /var/www
 
-composer create-project --prefer-dist yiisoft/yii2-app-basic site
+composer create-project --prefer-dist yiisoft/yii2-app-basic site --no-interaction
 
 # Install vendor files
 cd /var/www/site
-composer update
+composer update --no-interaction

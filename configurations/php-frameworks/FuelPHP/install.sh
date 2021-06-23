@@ -23,4 +23,4 @@ composer create-project fuel/fuel --prefer-dist site --no-interaction
 
 # Install vendor files
 cd /var/www/site
-composer update
+composer update --no-interaction

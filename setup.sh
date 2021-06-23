@@ -685,24 +685,6 @@ create_server_conf_file() {
   else
     cp -p "${container_dir}/configurations/server-files/${service_server,,}/default.conf" "${server_conf_file}"
   fi
-
-  # Make modifications to the server configuration file.
-  printf "\nUpdating conf-files/${server_conf_file##*/} ..."
-  if [[ "${php_framework^^}" == "CAKEPHP" ]]; then
-    sed -i "s/server_name .*/server_name localhost;/g" ${server_conf_file}
-    sed -i "s/[::]:80 /[::]:${port}/g" ${server_conf_file}
-    sed -i "s/error_log .*/error_log  \/var\/www\/${project_name}\/log\/error.log;/g" ${server_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/www\/${project_name}\/log\/access.log;/g" ${server_conf_file}
-  elif [[ "${php_framework^^}" == "CODEIGNITER" ]]; then
-    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
-  elif [[ "${php_framework^^}" == "YII2" ]]; then
-    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
-  else
-    sed -i "s/error_log .*/error_log  \/var\/log\/nginx\/${project_name}_error.log;/g" ${server_conf_file}
-    sed -i "s/access_log .*/access_log \/var\/log\/nginx\/${project_name}_access.log;/g" ${server_conf_file}
-  fi
 }
 
 create_db_init_file() {
@@ -749,7 +731,7 @@ create_db_init_file() {
 }
 
 initialize_cakephp_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
 
 initialize_codeigniter_project() {

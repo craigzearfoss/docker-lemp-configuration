@@ -28,4 +28,4 @@ fi
 
 # Install vendor files
 cd /var/www/site
-composer update
+composer update --no-interaction

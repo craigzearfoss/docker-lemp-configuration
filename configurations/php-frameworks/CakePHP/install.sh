@@ -23,5 +23,5 @@ composer create-project --prefer-dist cakephp/app:~4.0 site --no-interaction
 
 # Install vendor files
 cd /var/www/site
-composer update
+composer update --no-interaction
 
