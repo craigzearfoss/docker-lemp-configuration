@@ -28,10 +28,10 @@ if [[ -f "${config_file}" ]]; then
 
   # Update database configuration
   echo "Updating database configurations ..."
-  sed -i "0,/.*'host' =>.*/{s/.*'host' => 'localhost',.*/            'host' => 'db-${service_db,,}',/g}" "${config_file}"
-  sed -i "0,/.*'username' =>.*/{s/.*'username' => 'my_app',.*/            'username' => '${db_username}',/g}" "${config_file}"
-  sed -i "0,/.*'password' =>.*/{s/.*'password' => 'secret',.*/            'password' => '${db_password}',/g}" "${config_file}"
-  sed -i "0,/.*'schema' =>.*/{s/.*'schema' => 'my_app',.*/            'schema' => '${db_name}',/g}" "${config_file}"
+  sed -i "0,/.*'host' => 'localhost',.*/{s/.*'host' => 'localhost',.*/            'host' => 'db-${service_db,,}',/g}" "${config_file}"
+  sed -i "0,/.*'username' => 'my_app',.*/{s/.*'username' => 'my_app',.*/            'username' => '${db_username}',/g}" "${config_file}"
+  sed -i "0,/.*'password' => 'secret',.*/{s/.*'password' => 'secret',.*/            'password' => '${db_password}',/g}" "${config_file}"
+  sed -i "0,/.*'database' => 'my_app',.*/{s/.*'database' => 'my_app',.*/            'database' => '${db_name}',/g}" "${config_file}"
 
   # @TODO: Need to add updates for email configuration
 fi
