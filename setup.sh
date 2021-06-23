@@ -807,7 +807,7 @@ initialize_wordpress_project() {
 }
 
 initialize_yii2_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
 
 build_create_project_script() {

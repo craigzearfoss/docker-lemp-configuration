@@ -23,7 +23,7 @@ full_install= {{full_install}}
 if [[ "${full_install}" == true ]]; then
   composer create-project --prefer-dist yiisoft/yii2-app-basic site --no-interaction
 else
-  composer create-project --prefer-dist yiisoft/yii2-app-basic basic --no-interaction
+  composer create-project --prefer-dist yiisoft/yii2-app-basic site --no-interaction
 fi
 
 # Install vendor files
