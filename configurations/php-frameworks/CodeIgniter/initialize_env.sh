@@ -9,14 +9,13 @@ db_admin_port="{{db_admin_port}}"
 db_exposed_port="{{db_exposed_port}}"
 db_name="{{db_name}}"
 db_password="{{db_password}}"
+db_port="{{db_port}}"
 db_username="{{db_username}}"
 full_install={{full_install}}
 git_repo="{{git_repo}}"
-local_web_root="{{local_web_root}}"
 port="{{port}}"
 project_name="{{project_name}}"
 service_db="{{service_db}}"
-web_root="{{web_root}}"
 
 # Make sure .env file exists
 if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
@@ -46,6 +45,7 @@ if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
 fi
 
 if [[ -f "$env_file" ]]; then
+
   # Make modifications to .env file
   echo "Modifying .env file ..."
   sed -i "s/.*CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" "${env_file}"
@@ -66,6 +66,59 @@ if [[ -f "$env_file" ]]; then
      sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
      sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
   fi
+
+else
+
+  # Create .env file
+  echo "#--------------------------------------------------------------------" > "${env_file}"
+  echo "# ENVIRONMENT" >> "${env_file}"
+  echo "#--------------------------------------------------------------------" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "CI_ENVIRONMENT = development" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "#--------------------------------------------------------------------" >> "${env_file}"
+  echo "# APP" >> "${env_file}"
+  echo "#--------------------------------------------------------------------" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "# app.baseURL = ''" >> "${env_file}"
+  echo "# app.forceGlobalSecureRequests = false" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "# app.sessionDriver = 'CodeIgniter\Session\Handlers\FileHandler'" >> "${env_file}"
+  echo "# app.sessionCookieName = 'ci_session'" >> "${env_file}"
+  echo "# app.sessionExpiration = 7200" >> "${env_file}"
+  echo "# app.sessionSavePath = NULL" >> "${env_file}"
+  echo "# app.sessionMatchIP = false" >> "${env_file}"
+  echo "# app.sessionTimeToUpdate = 300" >> "${env_file}"
+  echo "# app.sessionRegenerateDestroy = false" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "# app.CSPEnabled = false" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "#--------------------------------------------------------------------" >> "${env_file}"
+  echo "# DATABASE" >> "${env_file}"
+  echo "#--------------------------------------------------------------------" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "database.default.hostname = db-${service_db,,}" >> "${env_file}"
+  echo "database.default.database = ${db_name}" >> "${env_file}"
+  echo "database.default.username = ${db_username}" >> "${env_file}"
+  echo "database.default.password = ${db_password}" >> "${env_file}"
+  if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
+    echo "database.default.DBDriver = MySQLi" >> "${env_file}"
+  else
+    echo "# database.default.DBDriver = MySQLi" >> "${env_file}"
+  fi
+  echo "database.default.DBPrefix =" >> "${env_file}"
+  echo "" >> "${env_file}"
+  echo "# database.tests.hostname = localhost" >> "${env_file}"
+  echo "# database.tests.database = ci4" >> "${env_file}"
+  echo "# database.tests.username = root" >> "${env_file}"
+  echo "# database.tests.password = root" >> "${env_file}"
+  echo "# database.tests.DBDriver = MySQLi" >> "${env_file}"
+  echo "# database.tests.DBPrefix =" >> "${env_file}"
+  echo "" >> "${env_file}"
+
+  # Only make the following changes for a new project, that is not from a git repo
+   sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
+   sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
 fi
 
 # Clear CodeIgniter cache

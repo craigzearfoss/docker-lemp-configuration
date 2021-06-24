@@ -3,8 +3,9 @@ services:
   app:
     build:
       args:
-        user: {{user}}
+        user: devuser
         uid: 1000
+        php_framework: ''
       context: ./
       dockerfile: Dockerfile
     image: sample

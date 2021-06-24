@@ -16,6 +16,14 @@ fi
 cd /var/www
 git clone {{git_repo}} site
 
+# Checkout branch (if specified)
+if [ ! -z "{{git_branch}}" ]; then
+  echo  "Checking out git branch {{git_branch}} ..."
+  cd /var/www/site
+  git checkout {{git_branch}}
+fi
+
 # Install vendor files
 cd /var/www/site
 composer update
+

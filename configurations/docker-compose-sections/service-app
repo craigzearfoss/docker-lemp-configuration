@@ -2,7 +2,8 @@
     build:
       args:
         user: {{user}}
-        uid: 1000
+        uid: {{uid}}
+        php_framework: {{php_framework}}
       context: ./
       dockerfile: Dockerfile
     image: {{project_name}}

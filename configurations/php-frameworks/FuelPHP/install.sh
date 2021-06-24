@@ -21,6 +21,10 @@ cd /var/www
 
 composer create-project fuel/fuel --prefer-dist site --no-interaction
 
+# Set directory permissions
+cd /var/www/site
+oil refine install
+
 # Install vendor files
 cd /var/www/site
 composer update --no-interaction

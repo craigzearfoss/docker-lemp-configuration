@@ -3,6 +3,8 @@ FROM php:8.0-fpm
 # Arguments defined in docker-compose.yml
 ARG user
 ARG uid
+ARG php_framework
+ARG nodejs_version
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions (Needed for CodeIgniter)
+# Install PHP extensions
 RUN docker-php-ext-install pdo_mysql exif pcntl bcmath gd
 
 # Install intl PHP extension
@@ -35,6 +37,8 @@ RUN pecl install xdebug \
     && docker-php-ext-enable xdebug \
     && echo "xdebug.mode=debug" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
     && echo "xdebug.client_host = host.docker.internal" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+
+RUN curl -L https://get.fuelphp.com/oil | sh
 
 # Install vim and nano
 RUN apt-get -y update \
@@ -53,6 +57,13 @@ RUN mkdir -p /home/$user/.composer && \
 # Copy the script that builds the project
 COPY /create_project.sh /var/www/create_project.sh
 RUN chmod +x /var/www/create_project.sh
+
+COPY /args.txt /var/www/args.txt
+RUN echo "args:" >> /var/www/args.txt
+RUN echo "  user: $user" >> /var/www/args.txt
+RUN echo "  uid: $uid" >> /var/www/args.txt
+RUN echo "  php_framework: $php_framework" >> /var/www/args.txt
+RUN echo "  nodejs_version: $nodejs_version" >> /var/www/args.txt
 
 # Set working directory
 WORKDIR /var/www

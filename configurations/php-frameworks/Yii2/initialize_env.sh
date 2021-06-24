@@ -9,14 +9,13 @@ db_admin_port="{{db_admin_port}}"
 db_exposed_port="{{db_exposed_port}}"
 db_name="{{db_name}}"
 db_password="{{db_password}}"
+db_port="{{db_port}}"
 db_username="{{db_username}}"
 full_install={{full_install}}
 git_repo="{{git_repo}}"
-local_web_root="{{local_web_root}}"
 port="{{port}}"
 project_name="{{project_name}}"
 service_db="{{service_db}}"
-web_root="{{web_root}}"
 
 if [[ -f "${config_file}" ]]; then
 

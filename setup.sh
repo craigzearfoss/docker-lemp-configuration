@@ -5,6 +5,7 @@ script_completed=false
 
 working_dir="$(pwd)"
 user="devuser"
+uid=1000
 
 service_app="app"
 service_server="NGINX" # NGINX
@@ -22,6 +23,7 @@ nodejs_versions=("16.3.0" "14.17.1" "12.22.1")
 project_name=$1
 php_framework=""
 git_repo=""
+git_branch=""
 container_base_dir=$(echo $working_dir | sed "s|\(.*\)/.*|\1|")
 container_dir="${container_base_dir}/${project_name}"
 site_dir="${container_dir}/site"
@@ -145,10 +147,12 @@ replace_variables_in_file() {
   sed -i "s/{{db_username}}/${db_username}/g" "${__file_to_process}"
   sed -i "s/{{full_install}}/true/g" "${__file_to_process}"
   sed -i "s/{{git_repo}}/${git_repo//\//\\/}/g" "${__file_to_process}"
+  sed -i "s/{{git_branch}}/${git_branch//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{local_web_root}}/${local_web_root//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{nodejs_version}}/${nodejs_version}/g" "${__file_to_process}"
   sed -i "s/{{pgadmin_default_email}}/${pgadmin_default_email}/g" "${__file_to_process}"
   sed -i "s/{{pgadmin_default_password}}/${pgadmin_default_password//\//\\/}/g" "${__file_to_process}"
+  sed -i "s/{{php_framework}}/${php_framework^^}/g" "${__file_to_process}"
   sed -i "s/{{port}}/${port}/g" "${__file_to_process}"
   sed -i "s/{{project_name}}/${project_name}/g" "${__file_to_process}"
   sed -i "s/{{service_db}}/${service_db,,}/g" "${__file_to_process}"
@@ -156,6 +160,7 @@ replace_variables_in_file() {
   sed -i "s/{{service_server}}/${service_server,,}/g" "${__file_to_process}"
   sed -i "s/{{site_url}}/${site_url//\//\\/}/g" "${__file_to_process}"
   sed -i "s/{{user}}/${user}/g" "${__file_to_process}"
+  sed -i "s/{{uid}}/${uid}/g" "${__file_to_process}"
   sed -i "s/{{web_root}}/${web_root//\//\\/}/g" "${__file_to_process}"
 }
 
@@ -260,6 +265,11 @@ set_git_repo() {
       git_repo=""
     fi
   done
+
+  if [ ! -z "${git_repo}" ]; then
+    printf "\nEnter the git branch to check out or leave blank to use the default branch.\n"
+    read git_branch
+  fi
 }
 
 set_php_framework() {
@@ -749,7 +759,7 @@ initialize_codeigniter_project() {
 }
 
 initialize_fuelphp_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
 
 initialize_laminas_project() {
@@ -885,6 +895,12 @@ build_create_project_script() {
   sed -i "s/#!\/bin\/bash.*//g" "${create_project_script}"
   sed -i '1s/^/#!\/bin\/bash\n/' "${create_project_script}"
   replace_variables_in_file "${create_project_script}"
+
+  # Export variables
+  export user="${user}"
+  export uid="${uid}"
+  export php_framework="${php_framework^^}"
+  export nodejs_version="${nodejs_version}"
 }
 
 prompt_to_build_images() {
@@ -1086,6 +1102,7 @@ create_docker_files
 create_server_conf_file
 create_db_init_file
 build_create_project_script
+echo "# Args" > "${container_dir}/args.txt"
 
 # Allow the user to exit before building the images
 prompt_to_build_images

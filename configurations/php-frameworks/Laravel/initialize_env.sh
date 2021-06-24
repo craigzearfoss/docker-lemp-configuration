@@ -5,19 +5,17 @@ cd /var/www/site
 
 # Set variables
 env_file="/var/www/site/.env"
-db_port="{{db_port}}"
 db_admin_port="{{db_admin_port}}"
 db_exposed_port="{{db_exposed_port}}"
 db_name="{{db_name}}"
 db_password="{{db_password}}"
+db_port="{{db_port}}"
 db_username="{{db_username}}"
 full_install={{full_install}}
 git_repo="{{git_repo}}"
-local_web_root="{{local_web_root}}"
 port="{{port}}"
 project_name="{{project_name}}"
 service_db="{{service_db}}"
-web_root="{{web_root}}"
 
 # Make sure .env file exists
 if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/.env.example" ]]; then
