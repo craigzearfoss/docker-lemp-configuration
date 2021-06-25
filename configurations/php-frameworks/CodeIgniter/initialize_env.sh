@@ -63,8 +63,8 @@ if [[ -f "$env_file" ]]; then
 
   # Only make the following changes for a new project, that is not from a git repo
   if [ "${git_repo}" == "" ]; then
-     sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
-     sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
+     sed -i "s/public \$baseURL =.*/public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
+     sed -i "s/public \$indexPage =.*/public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
   fi
 
 else
@@ -117,8 +117,8 @@ else
   echo "" >> "${env_file}"
 
   # Only make the following changes for a new project, that is not from a git repo
-   sed -i "s/public \$baseURL =.*/        public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
-   sed -i "s/public \$indexPage =.*/        public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
+   sed -i "s/public \$baseURL =.*/public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
+   sed -i "s/public \$indexPage =.*/public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
 fi
 
 # Clear CodeIgniter cache
