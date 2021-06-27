@@ -19,8 +19,12 @@ service_db="{{service_db}}"
 
 # Make sure .env file exists
 if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
-
   cp /var/www/site/env "${env_file}"
+elif [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/.env.example" ]]; then
+  cp /var/www/site/.example.env "${env_file}"
+fi
+
+if [[ ! -f "$env_file" ]] && [[ -f "/var/www/site/env" ]]; then
 
   # Add additional lines to .env file
   echo "" >> "${env_file}"
@@ -49,12 +53,12 @@ if [[ -f "$env_file" ]]; then
   # Make modifications to .env file
   echo "Modifying .env file ..."
   sed -i "s/.*CI_ENVIRONMENT =.*/CI_ENVIRONMENT = development/g" "${env_file}"
-  sed -i "s/.*database.default.hostname =.*/database.default.hostname = db-${service_db,,}/g" "${env_file}"
-  sed -i "s/.*database.default.database =.*/database.default.database = ${db_name}/g" "${env_file}"
-  sed -i "s/.*database.default.username =.*/database.default.username = ${db_username}/g" "${env_file}"
+  sed -i "s/.*database.default.hostname =.*/database.default.hostname = 'db-${service_db,,}'/g" "${env_file}"
+  sed -i "s/.*database.default.database =.*/database.default.database = '${db_name}'/g" "${env_file}"
+  sed -i "s/.*database.default.username =.*/database.default.username = '${db_username}'/g" "${env_file}"
   sed -i "s/.*database.default.password =.*/database.default.password = '${db_password}'/g" "${env_file}"
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
-    sed -i "s/.*database.default.DBDriver =.*/database.default.DBDriver = MySQLi/g" "${env_file}"
+    sed -i "s/.*database.default.DBDriver =.*/database.default.DBDriver = 'MySQLi'/g" "${env_file}"
   fi
 
   hash=$(dd if=/dev/urandom bs=1 count=32 2>/dev/null | base64 -w 0 | rev | cut -b 2- | rev 2>&1)
@@ -63,8 +67,8 @@ if [[ -f "$env_file" ]]; then
 
   # Only make the following changes for a new project, that is not from a git repo
   if [ "${git_repo}" == "" ]; then
-     sed -i "s/public \$baseURL =.*/public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
-     sed -i "s/public \$indexPage =.*/public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
+     sed -i "s/.*app.baseURL =.*/app.baseURL = 'http:\/\/localhost:${port}\/';/" "${env_file}"
+     sed -i "s/.*app.indexPage =.*/app.indexPage = '';/g"  "${env_file}"
   fi
 
 else
@@ -80,7 +84,8 @@ else
   echo "# APP" >> "${env_file}"
   echo "#--------------------------------------------------------------------" >> "${env_file}"
   echo "" >> "${env_file}"
-  echo "# app.baseURL = ''" >> "${env_file}"
+  echo "# app.baseURL = 'http:\/\/localhost:${port}\/'" >> "${env_file}"
+  echo "# app.indexPage = ''" >> "${env_file}"
   echo "# app.forceGlobalSecureRequests = false" >> "${env_file}"
   echo "" >> "${env_file}"
   echo "# app.sessionDriver = 'CodeIgniter\Session\Handlers\FileHandler'" >> "${env_file}"
@@ -97,14 +102,14 @@ else
   echo "# DATABASE" >> "${env_file}"
   echo "#--------------------------------------------------------------------" >> "${env_file}"
   echo "" >> "${env_file}"
-  echo "database.default.hostname = db-${service_db,,}" >> "${env_file}"
-  echo "database.default.database = ${db_name}" >> "${env_file}"
-  echo "database.default.username = ${db_username}" >> "${env_file}"
-  echo "database.default.password = ${db_password}" >> "${env_file}"
+  echo "database.default.hostname = 'db-${service_db,,}'" >> "${env_file}"
+  echo "database.default.database = '${db_name}'" >> "${env_file}"
+  echo "database.default.username = '${db_username}'" >> "${env_file}"
+  echo "database.default.password = '${db_password}'" >> "${env_file}"
   if [[ "${service_db^^}" == "MYSQL" ]] || [[ "${service_db^^}" == "MARIADB" ]]; then
-    echo "database.default.DBDriver = MySQLi" >> "${env_file}"
+    echo "database.default.DBDriver = 'MySQLi'" >> "${env_file}"
   else
-    echo "# database.default.DBDriver = MySQLi" >> "${env_file}"
+    echo "# database.default.DBDriver = 'MySQLi'" >> "${env_file}"
   fi
   echo "database.default.DBPrefix =" >> "${env_file}"
   echo "" >> "${env_file}"
@@ -117,8 +122,8 @@ else
   echo "" >> "${env_file}"
 
   # Only make the following changes for a new project, that is not from a git repo
-   sed -i "s/public \$baseURL =.*/public \$baseURL = 'http:\/\/localhost:${port}\/';/" /var/www/site/app/Config/App.php
-   sed -i "s/public \$indexPage =.*/public \$indexPage = '';/g"  /var/www/site/app/Config/App.php
+     sed -i "s/.*app.baseURL =.*/app.baseURL = 'http:\/\/localhost:${port}\/';/" "${env_file}"
+     sed -i "s/.*app.indexPage =.*/app.indexPage = '';/g"  "${env_file}"
 fi
 
 # Clear CodeIgniter cache
