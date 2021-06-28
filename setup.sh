@@ -780,10 +780,10 @@ initialize_laravel_project() {
   fi
 
   if [[ $run_db_migrations == true ]]; then
-    cat "${working_dir}/configurations/php-frameworks/Laravel/migrate.sh" >> "${create_project_script}"
+    cat "${working_dir}/configurations/php-frameworks/${php_framework}/migrate.sh" >> "${create_project_script}"
   fi
   if [[ $run_db_seeds == true ]]; then
-    cat "${working_dir}/configurations/php-frameworks/Laravel/seed.sh" >> "${create_project_script}"
+    cat "${working_dir}/configurations/php-frameworks/${php_framework}/seed.sh" >> "${create_project_script}"
   fi
 
   substring="livewire"
@@ -797,7 +797,14 @@ initialize_laravel_project() {
 }
 
 initialize_lumen_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
+
+  if [[ $run_db_migrations == true ]]; then
+    cat "${working_dir}/configurations/php-frameworks/${php_framework}/migrate.sh" >> "${create_project_script}"
+  fi
+  if [[ $run_db_seeds == true ]]; then
+    cat "${working_dir}/configurations/php-frameworks/${php_framework}/seed.sh" >> "${create_project_script}"
+  fi
 }
 
 initialize_phalcon_project() {
@@ -805,7 +812,7 @@ initialize_phalcon_project() {
 }
 
 initialize_slim_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
 
 initialize_symfony_project() {
