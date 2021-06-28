@@ -55,7 +55,7 @@ for entry in configurations/php-frameworks/*; do
   php_frameworks+=("${entry##*/}")
 done
 
-frameworks_with_partial_installs=("Symfony" "Yii2")
+frameworks_with_partial_installs=("Laravel" "Yii2")
 frameworks_with_db_migrations=("CodeIgniter" "Laravel")
 frameworks_with_db_seeds=("CodeIgniter" "Laravel")
 
@@ -763,7 +763,7 @@ initialize_fuelphp_project() {
 }
 
 initialize_laminas_project() {
-  printf ""
+  cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
 
 initialize_laravel_project() {
@@ -1161,6 +1161,16 @@ printf "\n\tbash destroy.sh ${project_name}\n"
 
 if [[ -z "${php_framework}" ]] && [[ -z "${git_rep}" ]]; then
   printf "\nCreate your project in the ${project_name}-app container in the directory /www/var/${project_name}.\n\n"
+fi
+
+if [[ "${php_framework^^}" == "LAMINAS" ]]; then
+  printf "\n\nTo create a MySQL connection:\n"
+  printf "\n\t$adapter = new Laminas\Db\Adapter\Adapter(["
+  printf "\n\t  'driver'   => 'Mysqli',"
+  printf "\n\t  'database' => '${db_name}',"
+  printf "\n\t  'username' => '${db_username}',"
+  printf "\n\t  'password' => '${db_password}',"
+  printf "\n\t]);\n\n"
 fi
 
 exit
