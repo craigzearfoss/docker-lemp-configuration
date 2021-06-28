@@ -20,11 +20,11 @@ service_db="{{service_db}}"
 # Make sure .env file exists
 if [[ ! -f "$env_file" ]]; then
   if [[ -f "/var/www/site/.env.example" ]]; then
-    cp /var/www/site/.env.exampple "${env_file}"
+    cp /var/www/site/.env.example "${env_file}"
   elif [[ -f "/var/www/site/env" ]]; then
     cp /var/www/site/env "${env_file}"
   else
-    cp /var/www/configurations/php-frameworks/Laravel/.env "$env_file"
+    cp /var/www/configurations/php-frameworks/Laravel/.env "${env_file}"
   fi
 fi
 
