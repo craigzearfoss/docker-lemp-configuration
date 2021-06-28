@@ -24,7 +24,7 @@ if [[ ! -f "$env_file" ]]; then
   elif [[ -f "/var/www/site/env" ]]; then
     cp /var/www/site/env "${env_file}"
   else
-    cp /var/www/configurations/php-frameworks/CodeIgniter/env "$env_file"
+    cp /var/www/configurations/php-frameworks/CodeIgniter/.env "$env_file"
   fi
 fi
 
