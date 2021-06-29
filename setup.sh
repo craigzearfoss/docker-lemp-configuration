@@ -807,10 +807,6 @@ initialize_lumen_project() {
   fi
 }
 
-initialize_phalcon_project() {
-  printf ""
-}
-
 initialize_slim_project() {
   cat "${working_dir}/configurations/php-frameworks/${php_framework}/initialize_env.sh" >> "${create_project_script}"
 }
@@ -877,8 +873,6 @@ build_create_project_script() {
     initialize_laravel_project
   elif [[ "${php_framework^^}" == "LUMEN" ]]; then
     initialize_lumen_project
-  elif [[ "${php_framework^^}" == "PHALCON" ]]; then
-    initialize_phalcon_project
   elif [[ "${php_framework^^}" == "SLIM" ]]; then
     initialize_slim_project
   elif [[ "${php_framework^^}" == "SYMFONY" ]]; then

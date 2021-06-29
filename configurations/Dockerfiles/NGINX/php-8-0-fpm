@@ -44,6 +44,10 @@ RUN curl -L https://get.fuelphp.com/oil | sh
 RUN apt-get -y update \
     && apt-get install -y vim nano
 
+# Install yum
+RUN apt-get update -y \
+    && apt-get install -y yum
+
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
