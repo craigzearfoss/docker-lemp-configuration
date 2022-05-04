@@ -3,3 +3,6 @@ Redis
 
 MongoDB
     - https://www.bmc.com/blogs/mongodb-docker-container/
+
+MySQL dump
+    - docker exec -i dictionary-mysql mysqldump -uroot -p --databases dictionary --skip-comments > ~/Desktop/backups/db/dictionary_20220404-163000.sql

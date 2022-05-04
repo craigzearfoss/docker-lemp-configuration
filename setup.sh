@@ -166,7 +166,7 @@ replace_variables_in_file() {
 
 set_project_name() {
   if [ -z "${project_name}" ]; then
-    printf "\nEnter the project name. (Can only contain letters, numbers, underscores and dashes.)"
+    printf "\nEnter the project name. (Can only contain letters, numbers, underscores and dashes.)\n"
     valid_project_name=false
     while [ "${valid_project_name}" != true ]; do
       read  project_name
@@ -926,8 +926,11 @@ prompt_to_build_images() {
 build_docker_images() {
   printf "Building Docker images ...\n"
   cd "${container_dir}"
+  printf "\n    docker-compose build"
   docker-compose build
+  printf "\n    docker-compose up -d"
   docker-compose up -d
+  printf "\n    docker-compose ps"
   docker-compose ps
 
   # Remove init.sql setup file (Delete this file because it contains database user credentials)
@@ -991,6 +994,8 @@ display_configuration() {
   printf "\nContainer directory:      ${container_dir}"
   printf "\nSite directory:           ${site_dir}"
   printf "\nWeb root:                 ${web_root}"
+  printf "\nDockerfile:               ${dockerfile}"
+  printf "\nDocker compose file:      ${docker_compose_file}"
   printf "\nGit repository:           ${git_repo}"
   printf "\nPort:                     ${port}"
   printf "\nServer:                   ${service_server}"
@@ -1006,6 +1011,7 @@ display_configuration() {
   else
     printf "\nNode.js version:          [not installed]"
   fi
+  printf "\nDockerfile source:        ${src_dockerfile}"
   printf "\nDatabase:"
   printf "\n    Type:                 ${service_db}"
   printf "\n    Host/Server:          db-${service_db,,}"
@@ -1091,12 +1097,12 @@ set_database_admin_service
 # Should we create a phpinfo.php file?
 set_phpinfo_file
 
+# Define the docker files
+define_docker_files
+
 # Confirm settings before continuing
 display_configuration
 continue_confirmation
-
-# Define the docker files
-define_docker_files
 
 # Create the docker files
 create_docker_files
@@ -1149,6 +1155,10 @@ fi
 
 printf "\nTo access the Docker container:"
 printf "\n\tdocker exec -it ${project_name}-app bash\n"
+
+printf "\n"
+printf "\n\tdocker exec -it ${project_name}-mysql bash"
+printf "\n\tmysql -u ${db_username} -p\n"
 
 printf "\nTo destroy all Docker containers that were created:"
 printf "\n\tbash destroy.sh ${project_name}\n"
